@@ -13,7 +13,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Tenant {
+public class Tenant11 {
 
     @Id
     @GeneratedValue
