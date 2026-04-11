@@ -2,11 +2,14 @@ package com.wheelGo.service;
 
 import com.wheelGo.model.tenant.CreateTenantRequest;
 import com.wheelGo.model.tenant.Tenant;
+import com.wheelGo.model.tenant.UpdateTenantRequest;
 import com.wheelGo.repository.TenantRepository;
 import com.wheelGo.schema.TenantSchemaService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -63,5 +66,23 @@ public class TenantService {
 
         log.info("Tenant '{}' dhe schema '{}' u fshinë.",
                 tenant.getSlug(), tenant.getSchemaName());
+    }
+    @Transactional
+    public Tenant updateTenant(UUID id, UpdateTenantRequest req) {
+        Tenant tenant = tenantRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Tenant nuk u gjet."));
+
+        if (req.getName() != null) {
+            tenant.setName(req.getName());
+        }
+        if (req.getPlan() != null) {
+            tenant.setPlan(req.getPlan());
+        }
+        if (req.getIsActive() != null) {
+            tenant.setActive(req.getIsActive());
+        }
+
+        tenant.setUpdatedAt(LocalDateTime.now());
+        return tenantRepository.save(tenant);
     }
 }
