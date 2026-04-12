@@ -3,6 +3,7 @@ package com.wheelGo.controller;
 import com.wheelGo.model.tenant.CreateTenantRequest;
 import com.wheelGo.model.tenant.Tenant;
 import com.wheelGo.model.tenant.TenantResponse;
+import com.wheelGo.model.tenant.UpdateTenantRequest;
 import com.wheelGo.service.TenantService;
 import jakarta.validation.Valid;
 import org.springframework.http.*;
@@ -27,6 +28,14 @@ public class TenantController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(TenantResponse.from(tenant));
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<TenantResponse> update(
+            @PathVariable UUID id,
+            @RequestBody UpdateTenantRequest request) {
+        Tenant updated = tenantService.updateTenant(id, request);
+        return ResponseEntity.ok(TenantResponse.from(updated));
     }
 
     @GetMapping
