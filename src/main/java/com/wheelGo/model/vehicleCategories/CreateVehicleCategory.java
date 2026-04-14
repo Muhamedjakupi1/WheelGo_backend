@@ -6,7 +6,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Getter @Setter
-public class CreateVehicleCategories {
+public class CreateVehicleCategory {
 
     @NotBlank(message = "Name is required")
     @Size(max = 60)
