@@ -7,13 +7,13 @@ import lombok.Setter;
 @Getter @Setter
 public class CreateTenantRequest {
 
-    @NotBlank(message = "Emri nuk mund të jetë bosh")
+    @NotBlank(message = "Name cannot be empty")
     private String name;
 
     @NotBlank
     @Pattern(
             regexp = "^[a-z0-9-]{2,50}$",
-            message = "Slug: vetëm shkronja të vogla, numra dhe vizë"
+            message = "Slug: only lowercase letters, numbers and hyphen are allowed"
     )
     private String slug;
 
