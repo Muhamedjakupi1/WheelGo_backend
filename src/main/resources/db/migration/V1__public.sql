@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS public.tenants (
     schema_name VARCHAR(63)  NOT NULL UNIQUE,
     plan        VARCHAR(20)  NOT NULL DEFAULT 'FREE',
     is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
+    is_impersonate BOOLEAN   DEFAULT FALSE,
     created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMP    NOT NULL DEFAULT NOW()
     );
