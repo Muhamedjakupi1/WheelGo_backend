@@ -14,6 +14,7 @@ public class UserResponse {
     private boolean       isActive;
     private boolean       emailVerified;
     private UUID          tenantId;
+    private boolean       isImpersonate;
     private LocalDateTime createdAt;
 
     public static UserResponse from(User u) {
@@ -24,6 +25,7 @@ public class UserResponse {
         r.setActive(u.isActive());
         r.setEmailVerified(u.isEmailVerified());
         r.setTenantId(u.getTenant().getId());
+        r.setImpersonate(u.isImpersonate());
         r.setCreatedAt(u.getCreatedAt());
         return r;
     }
