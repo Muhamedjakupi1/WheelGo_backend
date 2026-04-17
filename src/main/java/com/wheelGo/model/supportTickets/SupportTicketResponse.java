@@ -1,5 +1,7 @@
 package com.wheelGo.model.supportTickets;
 
+import com.wheelGo.model.enums.TicketPriority;
+import com.wheelGo.model.enums.TicketStatus;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -12,8 +14,8 @@ public class SupportTicketResponse {
     private UUID userId;
     private UUID bookingId;
     private String subject;
-    private String status;
-    private String priority;
+    private TicketStatus status;
+    private TicketPriority priority;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
