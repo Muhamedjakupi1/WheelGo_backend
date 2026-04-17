@@ -1,5 +1,6 @@
 package com.wheelGo.model.chatMessages;
 
+import com.wheelGo.model.enums.ChatRole;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -10,7 +11,7 @@ import java.util.UUID;
 public class ChatMessageResponse {
     private UUID id;
     private UUID sessionId;
-    private String role;
+    private ChatRole role;
     private String content;
     private Integer tokensUsed;
     private LocalDateTime createdAt;

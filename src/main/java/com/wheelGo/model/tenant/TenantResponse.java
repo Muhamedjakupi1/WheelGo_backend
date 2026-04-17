@@ -1,5 +1,6 @@
 package com.wheelGo.model.tenant;
 
+import com.wheelGo.model.enums.Plan;
 import lombok.Getter;
 import lombok.Setter;
 import java.util.UUID;
@@ -12,7 +13,7 @@ public class TenantResponse {
     private String name;
     private String slug;
     private String schemaName;
-    private String plan;
+    private Plan plan;
     private boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

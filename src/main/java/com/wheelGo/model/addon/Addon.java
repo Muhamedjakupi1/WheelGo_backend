@@ -1,10 +1,13 @@
 package com.wheelGo.model.addon;
 
+import com.wheelGo.model.enums.AddonType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.dialect.type.PostgreSQLEnumJdbcType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -32,7 +35,9 @@ public class Addon {
     private BigDecimal price;
 
     @Column(length = 40)
-    private String type;
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    private AddonType type;
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;

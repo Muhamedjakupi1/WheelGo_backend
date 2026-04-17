@@ -1,10 +1,13 @@
 package com.wheelGo.model.audit_logs;
 
+import com.wheelGo.model.enums.AuditAction;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcType;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.dialect.type.PostgreSQLEnumJdbcType;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
@@ -23,7 +26,9 @@ public class AuditLog {
     private UUID userId;
 
     @Column(nullable = false, length = 60)
-    private String action;
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    private AuditAction action;
 
     @Column(name = "entity_type", nullable = false, length = 60)
     private String entityType;

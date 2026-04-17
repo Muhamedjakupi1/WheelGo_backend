@@ -1,5 +1,6 @@
 package com.wheelGo.model.chatMessages;
 
+import com.wheelGo.model.enums.ChatRole;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
 
@@ -11,7 +12,7 @@ public class CreateChatMessageRequest {
     private UUID sessionId;
 
     @NotBlank(message = "Role is required")
-    private String role; // USER, ASSISTANT, ose SYSTEM
+    private ChatRole role;
 
     @NotBlank(message = "Content cannot be empty")
     private String content;
