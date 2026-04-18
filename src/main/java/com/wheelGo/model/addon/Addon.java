@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "addons", schema = "kompania_x")
+@Table(name = "addons")
 @Getter
 @Setter
 @AllArgsConstructor

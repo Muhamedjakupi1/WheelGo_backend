@@ -18,18 +18,4 @@ public class DriverLicenseResponse {
     private String        backImageUrl;
     private LocalDateTime verifiedAt;
     private boolean       isVerified;
-
-    public static DriverLicenseResponse from(DriverLicense d) {
-        DriverLicenseResponse r = new DriverLicenseResponse();
-        r.setId(d.getId());
-        r.setUserId(d.getUser().getId());
-        r.setLicenseNumber(d.getLicenseNumber());
-        r.setIssuingCountry(d.getIssuingCountry());
-        r.setExpiryDate(d.getExpiryDate());
-        r.setFrontImageUrl(d.getFrontImageUrl());
-        r.setBackImageUrl(d.getBackImageUrl());
-        r.setVerifiedAt(d.getVerifiedAt());
-        r.setVerified(d.getVerifiedAt() != null);
-        return r;
-    }
 }

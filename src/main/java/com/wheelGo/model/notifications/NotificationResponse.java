@@ -17,17 +17,4 @@ public class NotificationResponse {
     private NotificationChannel channel;
     private boolean isRead;
     private LocalDateTime sentAt;
-
-    public static NotificationResponse from(Notification notification) {
-        NotificationResponse response = new NotificationResponse();
-        response.setId(notification.getId());
-        response.setUserId(notification.getUserId());
-        response.setType(notification.getType());
-        response.setTitle(notification.getTitle());
-        response.setBody(notification.getBody());
-        response.setChannel(notification.getChannel());
-        response.setRead(notification.isRead());
-        response.setSentAt(notification.getSentAt());
-        return response;
-    }
 }
