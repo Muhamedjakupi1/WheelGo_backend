@@ -1,10 +1,13 @@
 package com.wheelGo.model.promotions;
 
+import com.wheelGo.model.enums.DiscountType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.dialect.type.PostgreSQLEnumJdbcType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -26,7 +29,9 @@ public class Promotion {
     private String code;
 
     @Column(name = "discount_type", nullable = false, length = 20)
-    private String discountType = "PERCENTAGE";
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    private DiscountType discountType = DiscountType.PERCENTAGE;
 
     @Column(name = "discount_value", nullable = false, precision = 10, scale = 2)
     private BigDecimal discountValue;
