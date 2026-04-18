@@ -1,5 +1,6 @@
 package com.wheelGo.model.maintenanceRecords;
 
+import com.wheelGo.model.enums.MaintenanceType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -14,7 +15,7 @@ import java.util.UUID;
 public class MaintenanceRecordResponse {
     private UUID id;
     private UUID vehicleId;
-    private String type;
+    private MaintenanceType type;
     private String description;
     private BigDecimal cost;
     private LocalDateTime performedAt;

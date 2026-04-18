@@ -1,8 +1,12 @@
 package com.wheelGo.model.user;
 
+import com.wheelGo.model.enums.Role;
 import com.wheelGo.model.tenant.Tenant;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.dialect.type.PostgreSQLEnumJdbcType;
+
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -26,7 +30,9 @@ public class User {
     private String passwordHash;
 
     @Column(nullable = false)
-    private String role = "CUSTOMER";
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    private Role role = Role.CUSTOMER;
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
