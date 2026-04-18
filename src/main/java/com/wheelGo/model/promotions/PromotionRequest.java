@@ -1,5 +1,6 @@
 package com.wheelGo.model.promotions;
 
+import com.wheelGo.model.enums.DiscountType;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -10,7 +11,7 @@ import java.time.LocalDateTime;
 @Setter
 public class PromotionRequest {
     private String code;
-    private String discountType;
+    private DiscountType discountType;
     private BigDecimal discountValue;
     private Integer maxUses;
     private Integer usesCount;

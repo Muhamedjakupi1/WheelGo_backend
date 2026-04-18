@@ -1,5 +1,6 @@
 package com.wheelGo.model.addon;
 
+import com.wheelGo.model.enums.AddonType;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -14,7 +15,7 @@ public class AddonResponse {
     private String name;
     private String description;
     private BigDecimal price;
-    private String type;
+    private AddonType type;
     private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

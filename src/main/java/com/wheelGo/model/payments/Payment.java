@@ -1,10 +1,14 @@
 package com.wheelGo.model.payments;
 
+import com.wheelGo.model.enums.PaymentMethod;
+import com.wheelGo.model.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.dialect.type.PostgreSQLEnumJdbcType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -32,10 +36,14 @@ public class Payment {
     private String currency = "EUR";
 
     @Column(nullable = false, length = 30)
-    private String method;
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    private PaymentMethod method;
 
     @Column(nullable = false, length = 20)
-    private String status = "PENDING";
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    private PaymentStatus status = PaymentStatus.PENDING;
 
     @Column(name = "gateway_ref", length = 150)
     private String gatewayRef;
