@@ -1,7 +1,11 @@
 package com.wheelGo.model.tenant;
 
+import com.wheelGo.model.enums.Plan;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.dialect.type.PostgreSQLEnumJdbcType;
+
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -24,7 +28,9 @@ public class Tenant {
     private String schemaName;
 
     @Column(nullable = false)
-    private String plan = "FREE";
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    private Plan plan = Plan.FREE;
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;

@@ -1,5 +1,8 @@
 package com.wheelGo.model.vehicles;
 
+import com.wheelGo.model.enums.FuelType;
+import com.wheelGo.model.enums.Transmission;
+import com.wheelGo.model.enums.VehicleStatus;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -18,11 +21,11 @@ public class VehicleResponse {
     private String model;
     private Short year;
     private String color;
-    private String fuelType;
-    private String transmission;
+    private FuelType fuelType;
+    private Transmission transmission;
     private Short seats;
     private BigDecimal dailyRate;
-    private String status;
+    private VehicleStatus status;
     private Integer mileage;
 
     public static VehicleResponse from(Vehicle v) {

@@ -1,5 +1,6 @@
 package com.wheelGo.model.user;
 
+import com.wheelGo.model.enums.Role;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.LocalDateTime;
@@ -10,7 +11,7 @@ public class UserResponse {
 
     private UUID          id;
     private String        email;
-    private String        role;
+    private Role          role;
     private boolean       isActive;
     private boolean       emailVerified;
     private UUID          tenantId;

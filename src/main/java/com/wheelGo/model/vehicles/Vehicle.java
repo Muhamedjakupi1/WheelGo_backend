@@ -1,12 +1,17 @@
 package com.wheelGo.model.vehicles;
 
+import com.wheelGo.model.enums.FuelType;
+import com.wheelGo.model.enums.Transmission;
+import com.wheelGo.model.enums.VehicleStatus;
 import com.wheelGo.model.locations.Location;
 import com.wheelGo.model.vehicleCategories.VehicleCategory;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcType;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.dialect.type.PostgreSQLEnumJdbcType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -48,10 +53,14 @@ public class Vehicle {
     private String vin;
 
     @Column(name = "fuel_type", nullable = false)
-    private String fuelType = "PETROL";
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    private FuelType fuelType = FuelType.PETROL;
 
     @Column(nullable = false)
-    private String transmission = "MANUAL";
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    private Transmission transmission = Transmission.MANUAL;
 
     @Column(nullable = false)
     private Short seats = 5;
@@ -60,7 +69,9 @@ public class Vehicle {
     private BigDecimal dailyRate;
 
     @Column(nullable = false)
-    private String status = "AVAILABLE";
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    private VehicleStatus status = VehicleStatus.AVAILABLE;
 
     @Column(nullable = false)
     private Integer mileage = 0;

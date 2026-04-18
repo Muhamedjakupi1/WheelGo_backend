@@ -1,6 +1,7 @@
 package com.wheelGo.model.maintenanceRecords;
 
 
+import com.wheelGo.model.enums.MaintenanceType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -16,7 +17,7 @@ import java.time.LocalDateTime;
 public class UpdateMaintenanceRecords {
 
     @NotBlank(message = "Maintenance type is required")
-    private String type;
+    private MaintenanceType type;
 
     @Size(max = 500)
     private String description;
