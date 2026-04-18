@@ -1,5 +1,6 @@
 package com.wheelGo.model.audit_logs;
 
+import com.wheelGo.model.enums.AuditAction;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -11,7 +12,7 @@ import java.util.UUID;
 public class AuditLogResponse {
     private UUID id;
     private UUID userId;
-    private String action;
+    private AuditAction action;
     private String entityType;
     private UUID entityId;
     private Map<String, Object> oldValues;
