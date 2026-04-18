@@ -89,7 +89,7 @@ public class AuthService {
         User user = new User();
         user.setEmail(req.email().trim().toLowerCase());
         user.setPasswordHash(passwordEncoder.encode(req.password()));
-        user.setRole(Role.CUSTOMER);
+        user.setRole(Role.USER);
         user.setTenant(tenant);
         user.setActive(true);
         user.setEmailVerified(true);
