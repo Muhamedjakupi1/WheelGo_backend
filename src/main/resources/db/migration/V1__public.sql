@@ -11,7 +11,6 @@ CREATE TABLE IF NOT EXISTS public.tenants (
     schema_name    VARCHAR(63)  NOT NULL UNIQUE,
     plan           public.tenant_plan NOT NULL DEFAULT 'FREE',
     is_active      BOOLEAN      NOT NULL DEFAULT TRUE,
-    is_impersonate BOOLEAN      DEFAULT FALSE,
     created_at     TIMESTAMP    NOT NULL DEFAULT NOW(),
     updated_at     TIMESTAMP    NOT NULL DEFAULT NOW()
     );
@@ -24,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     role           public.user_role  NOT NULL DEFAULT 'CUSTOMER',
     is_active      BOOLEAN           NOT NULL DEFAULT TRUE,
     email_verified BOOLEAN           NOT NULL DEFAULT FALSE,
+    is_impersonate BOOLEAN           DEFAULT FALSE,
     created_at     TIMESTAMP         NOT NULL DEFAULT NOW(),
     updated_at     TIMESTAMP         NOT NULL DEFAULT NOW(),
     UNIQUE (tenant_id, email)
