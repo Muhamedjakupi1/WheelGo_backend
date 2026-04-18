@@ -34,7 +34,7 @@ public class Notification {
     @Column (name = "is_read", nullable = false)
     private boolean isRead;
 
-    @Column(name = "sent-at", nullable = false, updatable = false)
+    @Column(name = "sent_at", nullable = false, updatable = false)
     private LocalDateTime sentAt = LocalDateTime.now();
 
 }
