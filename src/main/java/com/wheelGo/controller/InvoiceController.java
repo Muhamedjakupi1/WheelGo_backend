@@ -23,11 +23,8 @@ public class InvoiceController {
     private final InvoiceService invoicesService;
 
     @PostMapping
-    @Operation (summary = "Create Invoice")
-    public ResponseEntity<InvoiceResponse> create (@RequestBody @Valid CreateInvoiceRequest request){
-        return ResponseEntity.ok(InvoiceResponse.from(invoicesService.createInvoice(request)));
+    @Operation(summary = "Create Invoice")
+    public ResponseEntity<InvoiceResponse> create(@RequestBody @Valid CreateInvoiceRequest request) {
+        return ResponseEntity.ok(invoicesService.createInvoice(request));
     }
-
-
-
 }

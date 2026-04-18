@@ -16,15 +16,4 @@ public class BookingAddonResponse {
     private Short quantity;
     private BigDecimal priceSnapshot;
     private LocalDateTime createdAt;
-
-    public static BookingAddonResponse from(BookingAddon bookingAddon) {
-        BookingAddonResponse res = new BookingAddonResponse();
-        res.setId(bookingAddon.getId());
-        res.setBookingId(bookingAddon.getBookingId());
-        res.setAddonId(bookingAddon.getAddonId());
-        res.setQuantity(bookingAddon.getQuantity());
-        res.setPriceSnapshot(bookingAddon.getPriceSnapshot());
-        res.setCreatedAt(bookingAddon.getCreatedAt());
-        return res;
-    }
 }

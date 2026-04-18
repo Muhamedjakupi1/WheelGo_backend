@@ -19,17 +19,4 @@ public class AddonResponse {
     private Boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-
-    public static AddonResponse from(Addon addon) {
-        AddonResponse res = new AddonResponse();
-        res.setId(addon.getId());
-        res.setName(addon.getName());
-        res.setDescription(addon.getDescription());
-        res.setPrice(addon.getPrice());
-        res.setType(addon.getType());
-        res.setIsActive(addon.getIsActive());
-        res.setCreatedAt(addon.getCreatedAt());
-        res.setUpdatedAt(addon.getUpdatedAt());
-        return res;
-    }
 }

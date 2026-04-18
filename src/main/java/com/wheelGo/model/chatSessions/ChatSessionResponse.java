@@ -13,14 +13,4 @@ public class ChatSessionResponse {
     private String title;
     private LocalDateTime startedAt;
     private LocalDateTime endedAt;
-
-    public static ChatSessionResponse from(ChatSession session) {
-        ChatSessionResponse res = new ChatSessionResponse();
-        res.setId(session.getId());
-        res.setUserId(session.getUserId());
-        res.setTitle(session.getTitle());
-        res.setStartedAt(session.getStartedAt());
-        res.setEndedAt(session.getEndedAt());
-        return res;
-    }
 }

@@ -20,19 +20,4 @@ public class AuditLogResponse {
     private String ipAddress;
     private String userAgent;
     private LocalDateTime createdAt;
-
-    public static AuditLogResponse from(AuditLog log) {
-        AuditLogResponse res = new AuditLogResponse();
-        res.setId(log.getId());
-        res.setUserId(log.getUserId());
-        res.setAction(log.getAction());
-        res.setEntityType(log.getEntityType());
-        res.setEntityId(log.getEntityId());
-        res.setOldValues(log.getOldValues());
-        res.setNewValues(log.getNewValues());
-        res.setIpAddress(log.getIpAddress());
-        res.setUserAgent(log.getUserAgent());
-        res.setCreatedAt(log.getCreatedAt());
-        return res;
-    }
 }

@@ -13,13 +13,4 @@ public class VehicleCategoryResponse {
     private String name;
     private String description;
     private String imageUrl;
-
-    public static VehicleCategoryResponse from (VehicleCategory v) {
-        VehicleCategoryResponse vs = new VehicleCategoryResponse();
-        vs.setId(v.getId());
-        vs.setName(v.getName());
-        vs.setDescription(v.getDescription());
-        vs.setImageUrl(v.getImageUrl());
-        return vs;
-    }
 }

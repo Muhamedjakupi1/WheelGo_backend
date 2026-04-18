@@ -18,17 +18,4 @@ public class SupportTicketResponse {
     private TicketPriority priority;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-
-    public static SupportTicketResponse from (SupportTicket supportTicket) {
-        SupportTicketResponse response = new SupportTicketResponse();
-        response.setId(supportTicket.getId());
-        response.setUserId(supportTicket.getUserId());
-        response.setBookingId(supportTicket.getBookingId());
-        response.setSubject(supportTicket.getSubject());
-        response.setStatus(supportTicket.getStatus());
-        response.setPriority(supportTicket.getPriority());
-        response.setCreatedAt(supportTicket.getCreatedAt());
-        response.setUpdatedAt(supportTicket.getUpdatedAt());
-        return response;
-    }
 }
