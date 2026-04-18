@@ -32,7 +32,7 @@ public class User {
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
-    private Role role = Role.CUSTOMER;
+    private Role role = Role.USER;
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;

@@ -1,7 +1,7 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Enums
-CREATE TYPE public.user_role AS ENUM ('SUPER_ADMIN', 'ADMIN', 'CUSTOMER');
+CREATE TYPE public.user_role AS ENUM ('SUPER_ADMIN', 'ADMIN', 'USER');
 CREATE TYPE public.tenant_plan AS ENUM ('FREE', 'BASIC', 'PREMIUM', 'ENTERPRISE');
 
 CREATE TABLE IF NOT EXISTS public.tenants (
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     tenant_id      UUID              NOT NULL REFERENCES public.tenants(id),
     email          VARCHAR(150)      NOT NULL,
     password_hash  VARCHAR(255)      NOT NULL,
-    role           public.user_role  NOT NULL DEFAULT 'CUSTOMER',
+    role           public.user_role  NOT NULL DEFAULT 'USER',
     is_active      BOOLEAN           NOT NULL DEFAULT TRUE,
     email_verified BOOLEAN           NOT NULL DEFAULT FALSE,
     is_impersonate BOOLEAN           DEFAULT FALSE,
