@@ -16,5 +16,5 @@ public class CreateUserRequest {
     @Size(min = 8, message = "Password must have at least 8 characters")
     private String password;
 
-    private Role role = Role.CUSTOMER;
+    private Role role = Role.USER;
 }

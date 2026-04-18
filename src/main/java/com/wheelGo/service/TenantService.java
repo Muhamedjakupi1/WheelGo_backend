@@ -1,13 +1,19 @@
 package com.wheelGo.service;
 
 import com.wheelGo.mapper.TenantMapper;
+import com.wheelGo.model.enums.Role;
 import com.wheelGo.model.tenant.CreateTenantRequest;
 import com.wheelGo.model.tenant.Tenant;
 import com.wheelGo.model.tenant.TenantResponse;
 import com.wheelGo.model.tenant.UpdateTenantRequest;
+import com.wheelGo.model.user.User;
 import com.wheelGo.repository.TenantRepository;
+import com.wheelGo.repository.UserRepository;
 import com.wheelGo.schema.TenantSchemaService;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,18 +24,14 @@ import java.util.UUID;
 
 @Service
 @Slf4j
+@AllArgsConstructor
 public class TenantService {
 
     private final TenantRepository tenantRepository;
     private final TenantSchemaService schemaService;
     private final TenantMapper tenantMapper;
-
-    public TenantService(TenantRepository tenantRepository,
-                         TenantSchemaService schemaService, TenantMapper tenantMapper) {
-        this.tenantRepository = tenantRepository;
-        this.schemaService = schemaService;
-        this.tenantMapper = tenantMapper;
-    }
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional
     public TenantResponse createTenant(CreateTenantRequest req) {
@@ -43,19 +45,35 @@ public class TenantService {
             throw new RuntimeException("Slug '" + normalizedSlug + "' already exists.");
         }
 
+        if (userRepository.existsByEmail(req.getAdminEmail().trim().toLowerCase())) {
+            throw new RuntimeException("Admin email already exists.");
+        }
+
         String schemaName = normalizedSlug.replace("-", "_");
 
         Tenant tenant = new Tenant();
-        tenant.setName(req.getName());
+        tenant.setName(req.getName().trim());
         tenant.setSlug(normalizedSlug);
         tenant.setSchemaName(schemaName);
         tenant.setPlan(req.getPlan());
 
-        Tenant saved = tenantRepository.save(tenant);
+        Tenant savedTenant = tenantRepository.save(tenant);
         schemaService.createSchemaForTenant(schemaName);
 
-        log.info("Tenant '{}' was created with schema '{}'.", saved.getSlug(), schemaName);
-        return tenantMapper.toResponse(saved);
+        User adminUser = new User();
+        adminUser.setEmail(req.getAdminEmail().trim().toLowerCase());
+        adminUser.setPasswordHash(passwordEncoder.encode(req.getAdminPassword()));
+        adminUser.setRole(Role.ADMIN);
+        adminUser.setTenant(savedTenant);
+        adminUser.setActive(true);
+        adminUser.setEmailVerified(true);
+
+        userRepository.save(adminUser);
+
+        log.info("Tenant '{}' was created with schema '{}' and admin '{}'.",
+                savedTenant.getSlug(), schemaName, adminUser.getEmail());
+
+        return tenantMapper.toResponse(savedTenant);
     }
 
     public List<Tenant> getAll() {
