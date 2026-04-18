@@ -1,5 +1,6 @@
 package com.wheelGo.model.vehicles;
 
+import com.wheelGo.model.enums.VehicleStatus;
 import com.wheelGo.model.locations.Location;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -24,7 +25,7 @@ public class UpdateVehicles {
     private BigDecimal dailyRate;
 
     @NotBlank(message = "Status is required")
-    private String status;
+    private VehicleStatus status;
 
     @PositiveOrZero(message = "Mileage cannot be negative")
     private Integer mileage;

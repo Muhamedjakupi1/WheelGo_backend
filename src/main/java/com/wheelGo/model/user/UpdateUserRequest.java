@@ -1,5 +1,6 @@
 package com.wheelGo.model.user;
 
+import com.wheelGo.model.enums.Role;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
@@ -14,6 +15,6 @@ public class UpdateUserRequest {
     @Size(min = 8, message = "Fjalëkalimi duhet të ketë minimum 8 karaktere")
     private String password;
 
-    private String  role;
+    private Role    role;
     private Boolean isActive;
 }

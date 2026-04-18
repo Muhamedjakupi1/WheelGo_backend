@@ -1,5 +1,6 @@
 package com.wheelGo.model.tenant;
 
+import com.wheelGo.model.enums.Plan;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -17,5 +18,5 @@ public class CreateTenantRequest {
     )
     private String slug;
 
-    private String plan = "FREE";
+    private Plan plan = Plan.FREE;
 }
