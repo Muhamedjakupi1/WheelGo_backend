@@ -1,10 +1,13 @@
 package com.wheelGo.model.maintenanceRecords;
 
+import com.wheelGo.model.enums.MaintenanceType;
 import com.wheelGo.model.vehicles.Vehicle;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.dialect.type.PostgreSQLEnumJdbcType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -23,7 +26,9 @@ public class MaintenanceRecord {
     private Vehicle vehicle;
 
     @Column(nullable = false, length = 60)
-    private String type;
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    private MaintenanceType type;
 
     @Column(columnDefinition = "TEXT")
     private String description;

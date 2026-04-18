@@ -1,5 +1,6 @@
 package com.wheelGo.model.notifications;
 
+import com.wheelGo.model.enums.NotificationChannel;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -13,7 +14,7 @@ public class NotificationResponse {
     private String type;
     private String title;
     private String body;
-    private String channel;
+    private NotificationChannel channel;
     private boolean isRead;
     private LocalDateTime sentAt;
 

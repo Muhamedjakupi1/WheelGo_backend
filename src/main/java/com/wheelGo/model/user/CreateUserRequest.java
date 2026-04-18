@@ -1,5 +1,6 @@
 package com.wheelGo.model.user;
 
+import com.wheelGo.model.enums.Role;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,5 +16,5 @@ public class CreateUserRequest {
     @Size(min = 8, message = "Password must have at least 8 characters")
     private String password;
 
-    private String role = "CUSTOMER";
+    private Role role = Role.CUSTOMER;
 }
