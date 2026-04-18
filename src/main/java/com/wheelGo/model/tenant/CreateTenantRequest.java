@@ -19,4 +19,7 @@ public class CreateTenantRequest {
     private String slug;
 
     private Plan plan = Plan.FREE;
+
+    private String adminEmail;
+    private String adminPassword;
 }
