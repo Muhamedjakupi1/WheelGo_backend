@@ -25,27 +25,21 @@ public class TenantController {
     @PostMapping
     public ResponseEntity<TenantResponse> create(
             @RequestBody @Valid CreateTenantRequest request) {
-        Tenant tenant = tenantService.createTenant(request);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(TenantResponse.from(tenant));
+                .body(tenantService.createTenant(request));
     }
 
     @PatchMapping("/{id}")
     public ResponseEntity<TenantResponse> update(
             @PathVariable UUID id,
             @RequestBody UpdateTenantRequest request) {
-        Tenant updated = tenantService.updateTenant(id, request);
-        return ResponseEntity.ok(TenantResponse.from(updated));
+        return ResponseEntity.ok(tenantService.updateTenant(id,request));
     }
 
     @GetMapping
-    public ResponseEntity<List<TenantResponse>> getAll() {
-        List<TenantResponse> list = tenantService.getAll()
-                .stream()
-                .map(TenantResponse::from)
-                .toList();
-        return ResponseEntity.ok(list);
+    public ResponseEntity<List<Tenant>> getAll() {
+        return ResponseEntity.ok(tenantService.getAll());
     }
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {

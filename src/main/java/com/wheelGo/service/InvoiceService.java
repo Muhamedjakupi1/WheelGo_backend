@@ -1,8 +1,9 @@
 package com.wheelGo.service;
 
-
+import com.wheelGo.mapper.InvoiceMapper; // Shto këtë import
 import com.wheelGo.model.invoices.CreateInvoiceRequest;
 import com.wheelGo.model.invoices.Invoice;
+import com.wheelGo.model.invoices.InvoiceResponse; // Shto këtë import
 import com.wheelGo.repository.InvoiceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -19,10 +20,14 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class InvoiceService {
     private final InvoiceRepository invoicesRepository;
+    private final InvoiceMapper invoiceMapper;
 
     @Transactional
-    public Invoice createInvoice (CreateInvoiceRequest request){
-        invoicesRepository.findByBookingId(request.getBookingID()).ifPresent(i-> {throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The invoice for this booking already exists!"); });
+    public InvoiceResponse createInvoice(CreateInvoiceRequest request) {
+        invoicesRepository.findByBookingId(request.getBookingID())
+                .ifPresent(i -> {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The invoice for this booking already exists!");
+                });
 
         Invoice invoices = new Invoice();
         invoices.setBookingId(request.getBookingID());
@@ -33,14 +38,18 @@ public class InvoiceService {
 
         sendEmailAsync(saved.getInvoiceNumber());
 
-        return saved;
+        return invoiceMapper.toResponse(saved);
     }
-    public Invoice getInvoiceByBooking(UUID bookingId) {
-        return invoicesRepository.findByBookingId(bookingId)
+
+    public InvoiceResponse getInvoiceByBooking(UUID bookingId) {
+        Invoice invoice = invoicesRepository.findByBookingId(bookingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "This invoice does not exist"));
+
+        return invoiceMapper.toResponse(invoice);
     }
+
     @Async
-    public void sendEmailAsync(String invoiceNumber){
+    public void sendEmailAsync(String invoiceNumber) {
         System.out.println("Email is sent for " + invoiceNumber);
     }
 }

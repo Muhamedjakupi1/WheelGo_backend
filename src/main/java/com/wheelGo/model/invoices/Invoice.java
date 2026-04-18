@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "invoices")
+@Table(name = "invoices", schema = "wheelgo_prishtina")
 @Getter @Setter @NoArgsConstructor
 public class Invoice {
     @Id

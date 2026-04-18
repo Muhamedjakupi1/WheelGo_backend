@@ -12,14 +12,4 @@ public class TenantSettingsResponse {
     private String timezone;
     private String logoUrl;
     private String themeColor;
-
-    public static TenantSettingsResponse from(TenantSettings s) {
-        TenantSettingsResponse r = new TenantSettingsResponse();
-        r.setId(s.getId());
-        r.setCurrency(s.getCurrency());
-        r.setTimezone(s.getTimezone());
-        r.setLogoUrl(s.getLogoUrl());
-        r.setThemeColor(s.getThemeColor());
-        return r;
-    }
 }

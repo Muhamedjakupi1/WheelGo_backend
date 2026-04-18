@@ -6,7 +6,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class UpdateVehicleCategories {
+public class UpdateVehicleCategory {
     @Size(max = 60, message = "Name can not be longer than 60 characters")
     private String name;
 

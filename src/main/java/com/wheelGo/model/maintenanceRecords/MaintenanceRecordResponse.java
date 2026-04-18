@@ -21,17 +21,4 @@ public class MaintenanceRecordResponse {
     private LocalDateTime performedAt;
     private LocalDateTime nextDueAt;
     private String performedBy;
-
-    public static MaintenanceRecordResponse from(MaintenanceRecord record) {
-        MaintenanceRecordResponse res = new MaintenanceRecordResponse();
-        res.setId(record.getId());
-        res.setVehicleId(record.getVehicle().getId());
-        res.setType(record.getType());
-        res.setDescription(record.getDescription());
-        res.setCost(record.getCost());
-        res.setPerformedAt(record.getPerformedAt());
-        res.setNextDueAt(record.getNextDueAt());
-        res.setPerformedBy(record.getPerformedBy());
-        return res;
-    }
 }

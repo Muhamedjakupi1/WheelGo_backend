@@ -15,17 +15,4 @@ public class ReviewResponse {
     private int rating;
     private String comment;
     private LocalDateTime createdAt;
-
-    public static ReviewResponse from(Review review) {
-        ReviewResponse response = new ReviewResponse();
-        response.setId(review.getId());
-        response.setBookingId(review.getBookingId());
-        response.setUserId(review.getUserId());
-        response.setVehicleId(review.getVehicleId());
-        response.setRating(review.getRating());
-        response.setComment(review.getComment());
-        response.setCreatedAt(review.getCreatedAt());
-        return response;
-    }
-
 }
