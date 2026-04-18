@@ -285,8 +285,8 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     role        chat_role NOT NULL,
     content     TEXT      NOT NULL,
     tokens_used INT,
-    created_at  TIMESTAMP NOT NULL DEFAULT NOW()
-    );
+    created_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+    );  
 
 CREATE TABLE IF NOT EXISTS audit_logs (
     id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
