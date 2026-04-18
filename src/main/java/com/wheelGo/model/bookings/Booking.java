@@ -1,10 +1,13 @@
 package com.wheelGo.model.bookings;
 
+import com.wheelGo.model.enums.BookingStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.dialect.type.PostgreSQLEnumJdbcType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -59,7 +62,9 @@ public class Booking {
     private BigDecimal totalPrice;
 
     @Column(nullable = false, length = 20)
-    private String status = "PENDING";
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    private BookingStatus status = BookingStatus.PENDING;
 
     @Column(columnDefinition = "TEXT")
     private String notes;

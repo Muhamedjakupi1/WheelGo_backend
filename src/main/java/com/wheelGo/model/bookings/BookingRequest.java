@@ -1,5 +1,6 @@
 package com.wheelGo.model.bookings;
 
+import com.wheelGo.model.enums.BookingStatus;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -22,6 +23,6 @@ public class BookingRequest {
     private BigDecimal discountAmount;
     private BigDecimal addonPrice;
     private BigDecimal totalPrice;
-    private String status;
+    private BookingStatus status;
     private String notes;
 }
