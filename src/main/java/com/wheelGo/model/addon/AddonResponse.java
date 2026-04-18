@@ -25,7 +25,7 @@ public class AddonResponse {
         res.setName(addon.getName());
         res.setDescription(addon.getDescription());
         res.setPrice(addon.getPrice());
-        res.setType(addon.getType());
+        res.setType(String.valueOf(addon.getType()));
         res.setIsActive(addon.getIsActive());
         res.setCreatedAt(addon.getCreatedAt());
         res.setUpdatedAt(addon.getUpdatedAt());
