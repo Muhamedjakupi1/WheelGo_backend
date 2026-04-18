@@ -55,7 +55,7 @@ public class TenantSchemaService {
                 .load();
 
         flyway.migrate();
-        log.info("Migrations u ekzekutuan për schemën '{}'.", schemaName);
+        log.info("Migrations u ekzekutuan për schemën    '{}'.", schemaName);
     }
     public void dropSchemaForTenant(String schemaName) {
         validateSchemaName(schemaName);
