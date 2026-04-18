@@ -1,5 +1,6 @@
 package com.wheelGo.model.maintenanceRecords;
 
+import com.wheelGo.model.enums.MaintenanceType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -16,7 +17,7 @@ public class CreateMaintenanceRecord {
     private UUID vehicleId;
 
     @NotBlank(message = "Type of service is required")
-    private String type;
+    private MaintenanceType type;
 
     private String description;
 

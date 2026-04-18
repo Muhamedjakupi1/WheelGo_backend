@@ -1,5 +1,7 @@
 package com.wheelGo.model.vehicles;
 
+import com.wheelGo.model.enums.FuelType;
+import com.wheelGo.model.enums.Transmission;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -32,8 +34,8 @@ public class CreateVehicle {
 
     private String color;
     private String vin;
-    private String fuelType;
-    private String transmission;
+    private FuelType fuelType;
+    private Transmission transmission;
     private Short seats;
 
     @NotNull

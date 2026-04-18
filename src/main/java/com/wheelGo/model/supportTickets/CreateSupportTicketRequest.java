@@ -1,6 +1,7 @@
 package com.wheelGo.model.supportTickets;
 
 
+import com.wheelGo.model.enums.TicketPriority;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
@@ -16,6 +17,6 @@ public class CreateSupportTicketRequest {
     @Size (max = 150, message = "Subject cannot exceed 150 characters")
     private String subject;
 
-    private String priority;
+    private TicketPriority priority;
 }
 

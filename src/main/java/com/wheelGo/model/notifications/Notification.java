@@ -1,8 +1,11 @@
 package com.wheelGo.model.notifications;
 
+import com.wheelGo.model.enums.NotificationChannel;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.dialect.type.PostgreSQLEnumJdbcType;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -29,7 +32,9 @@ public class Notification {
     private String body;
 
     @Column (name = "channel", nullable = false, length = 20)
-    private String channel = "EMAIL";
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    private NotificationChannel channel = NotificationChannel.EMAIL;
 
     @Column (name = "is_read", nullable = false)
     private boolean isRead;

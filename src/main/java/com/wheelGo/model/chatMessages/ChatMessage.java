@@ -1,9 +1,12 @@
 package com.wheelGo.model.chatMessages;
 
 
+import com.wheelGo.model.enums.ChatRole;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.dialect.type.PostgreSQLEnumJdbcType;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -20,7 +23,9 @@ public class ChatMessage {
     private UUID sessionId;
 
     @Column(name = "role", nullable = false, length = 20)
-    private String role;
+    @Enumerated(EnumType.STRING)
+    @JdbcType(PostgreSQLEnumJdbcType.class)
+    private ChatRole role;
 
     @Column(name = "content", columnDefinition = "TEXT", nullable = false)
     private String content;
