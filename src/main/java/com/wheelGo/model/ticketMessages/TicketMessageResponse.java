@@ -15,14 +15,4 @@ public class TicketMessageResponse {
     private String message;
     private boolean isStaff;
     private LocalDateTime sentAt;
-
-    public static TicketMessageResponse from(TicketMessage ticketMessage) {
-        TicketMessageResponse ticketMessageResponse = new TicketMessageResponse();
-        ticketMessageResponse.setId(ticketMessage.getId());
-        ticketMessageResponse.setTicketId(ticketMessage.getTicketId());
-        ticketMessageResponse.setSenderId(ticketMessage.getSenderId());
-        ticketMessageResponse.setMessage(ticketMessage.getMessage());
-        ticketMessageResponse.setSentAt(ticketMessage.getSentAt());
-        return ticketMessageResponse;
-    }
 }

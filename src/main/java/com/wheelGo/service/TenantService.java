@@ -1,7 +1,9 @@
 package com.wheelGo.service;
 
+import com.wheelGo.mapper.TenantMapper;
 import com.wheelGo.model.tenant.CreateTenantRequest;
 import com.wheelGo.model.tenant.Tenant;
+import com.wheelGo.model.tenant.TenantResponse;
 import com.wheelGo.model.tenant.UpdateTenantRequest;
 import com.wheelGo.repository.TenantRepository;
 import com.wheelGo.schema.TenantSchemaService;
@@ -20,15 +22,17 @@ public class TenantService {
 
     private final TenantRepository tenantRepository;
     private final TenantSchemaService schemaService;
+    private final TenantMapper tenantMapper;
 
     public TenantService(TenantRepository tenantRepository,
-                         TenantSchemaService schemaService) {
+                         TenantSchemaService schemaService, TenantMapper tenantMapper) {
         this.tenantRepository = tenantRepository;
         this.schemaService = schemaService;
+        this.tenantMapper = tenantMapper;
     }
 
     @Transactional
-    public Tenant createTenant(CreateTenantRequest req) {
+    public TenantResponse createTenant(CreateTenantRequest req) {
         String normalizedSlug = normalizeSlug(req.getSlug());
 
         if (normalizedSlug == null || normalizedSlug.isBlank()) {
@@ -51,7 +55,7 @@ public class TenantService {
         schemaService.createSchemaForTenant(schemaName);
 
         log.info("Tenant '{}' was created with schema '{}'.", saved.getSlug(), schemaName);
-        return saved;
+        return tenantMapper.toResponse(saved);
     }
 
     public List<Tenant> getAll() {
@@ -71,7 +75,7 @@ public class TenantService {
     }
 
     @Transactional
-    public Tenant updateTenant(UUID id, UpdateTenantRequest req) {
+    public TenantResponse updateTenant(UUID id, UpdateTenantRequest req) {
         Tenant tenant = tenantRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tenant not found."));
 
@@ -88,7 +92,8 @@ public class TenantService {
         }
 
         tenant.setUpdatedAt(LocalDateTime.now());
-        return tenantRepository.save(tenant);
+        Tenant updated = tenantRepository.save(tenant);
+        return tenantMapper.toResponse(updated);
     }
 
     private String normalizeSlug(String value) {
