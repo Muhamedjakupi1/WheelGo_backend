@@ -2,19 +2,17 @@ package com.wheelGo.controller;
 
 import com.wheelGo.repository.TenantRepository;
 import com.wheelGo.schema.TenantPublicResponse;
+import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/public")
 @CrossOrigin(origins = "http://localhost:5173")
+@AllArgsConstructor
 public class PublicTenantController {
 
     private final TenantRepository tenantRepository;
-
-    public PublicTenantController(TenantRepository tenantRepository) {
-        this.tenantRepository = tenantRepository;
-    }
 
     @GetMapping("/tenants/{slug}")
     public ResponseEntity<?> getBySlug(@PathVariable String slug) {

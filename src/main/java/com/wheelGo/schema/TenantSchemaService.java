@@ -1,5 +1,6 @@
 package com.wheelGo.schema;
 
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.flywaydb.core.Flyway;
 import org.springframework.stereotype.Service;
@@ -10,13 +11,10 @@ import java.sql.Statement;
 
 @Service
 @Slf4j
+@AllArgsConstructor
 public class TenantSchemaService {
 
     private final DataSource dataSource;
-
-    public TenantSchemaService(DataSource dataSource) {
-        this.dataSource = dataSource;
-    }
 
     public void createSchemaForTenant(String schemaName) {
         validateSchemaName(schemaName);
