@@ -33,7 +33,14 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/auth/**",
-                                "/api/public/**"
+                                "/api/public/**",
+                                // Added the missing /api-docs paths:
+                                "/api-docs",
+                                "/api-docs/**",
+                                "/v3/api-docs",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
                         ).permitAll()
                         .requestMatchers("/api/super-admin/**").hasRole("SUPER_ADMIN")
                         .anyRequest().authenticated()

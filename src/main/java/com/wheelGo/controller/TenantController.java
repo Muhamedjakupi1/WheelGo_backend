@@ -6,6 +6,7 @@ import com.wheelGo.model.tenant.TenantResponse;
 import com.wheelGo.model.tenant.UpdateTenantRequest;
 import com.wheelGo.service.TenantService;
 import jakarta.validation.Valid;
+import lombok.AllArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,13 +16,10 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/super-admin/tenants")
 @CrossOrigin(origins = "http://localhost:5173")
+@AllArgsConstructor
 public class TenantController {
 
     private final TenantService tenantService;
-
-    public TenantController(TenantService tenantService) {
-        this.tenantService = tenantService;
-    }
 
     @PostMapping
     public ResponseEntity<TenantResponse> create(@RequestBody @Valid CreateTenantRequest request) {
