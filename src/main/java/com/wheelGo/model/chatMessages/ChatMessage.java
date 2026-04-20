@@ -22,7 +22,7 @@ public class ChatMessage {
     @Column(name = "session_id", nullable = false)
     private UUID sessionId;
 
-    @Column(name = "role", nullable = false, length = 20)
+    @Column(name = "role", nullable = false, columnDefinition = "chat_role")
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
     private ChatRole role;
