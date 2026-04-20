@@ -48,7 +48,4 @@ public class User {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt = LocalDateTime.now();
-
-    @Column(name = "age_fake")
-    private int ageFake;
 }
