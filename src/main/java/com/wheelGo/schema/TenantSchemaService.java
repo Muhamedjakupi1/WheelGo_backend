@@ -4,15 +4,20 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.flywaydb.core.Flyway;
 import org.springframework.stereotype.Service;
+
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 
 @Service
 @Slf4j
 @AllArgsConstructor
 public class TenantSchemaService {
+
+    private static final String TENANT_MIGRATION_LOCATION = "classpath:db/tenant";
+    private static final String TENANT_HISTORY_TABLE = "flyway_schema_history";
 
     private final DataSource dataSource;
 
@@ -20,6 +25,19 @@ public class TenantSchemaService {
         validateSchemaName(schemaName);
         createSchema(schemaName);
         runMigrations(schemaName);
+    }
+
+    public void migrateExistingSchema(String schemaName) {
+        validateSchemaName(schemaName);
+        createSchema(schemaName);
+        runMigrations(schemaName);
+    }
+
+    public void migrateExistingSchemas(List<String> schemaNames) {
+        for (String schemaName : schemaNames) {
+            log.info("Applying tenant migrations for schema '{}'.", schemaName);
+            migrateExistingSchema(schemaName);
+        }
     }
 
     private void validateSchemaName(String schemaName) {
@@ -47,8 +65,8 @@ public class TenantSchemaService {
                 .dataSource(dataSource)
                 .schemas(schemaName)
                 .defaultSchema(schemaName)
-                .locations("classpath:db/tenant")
-                .table("flyway_schema_history")
+                .locations(TENANT_MIGRATION_LOCATION)
+                .table(TENANT_HISTORY_TABLE)
                 .baselineOnMigrate(true)
                 .load();
 

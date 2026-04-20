@@ -28,7 +28,7 @@ public class Promotion {
     @Column(nullable = false, unique = true, length = 40)
     private String code;
 
-    @Column(name = "discount_type", nullable = false, length = 20)
+    @Column(name = "discount_type", nullable = false, columnDefinition = "discount_type")
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
     private DiscountType discountType = DiscountType.PERCENTAGE;

@@ -52,12 +52,12 @@ public class Vehicle {
     @Column(unique = true, length = 20)
     private String vin;
 
-    @Column(name = "fuel_type", nullable = false)
+    @Column(name = "fuel_type", nullable = false, columnDefinition = "fuel_type")
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
     private FuelType fuelType = FuelType.PETROL;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "transmission_type")
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
     private Transmission transmission = Transmission.MANUAL;
@@ -68,7 +68,7 @@ public class Vehicle {
     @Column(name = "daily_rate", nullable = false, precision = 10, scale = 2)
     private BigDecimal dailyRate;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "vehicle_status")
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
     private VehicleStatus status = VehicleStatus.AVAILABLE;

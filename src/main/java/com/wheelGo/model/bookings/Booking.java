@@ -61,7 +61,7 @@ public class Booking {
     @Column(name = "total_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalPrice;
 
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, columnDefinition = "booking_status")
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
     private BookingStatus status = BookingStatus.PENDING;
