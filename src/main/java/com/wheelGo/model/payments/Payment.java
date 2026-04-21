@@ -35,12 +35,12 @@ public class Payment {
     @Column(nullable = false, length = 10)
     private String currency = "EUR";
 
-    @Column(nullable = false, length = 30)
+    @Column(nullable = false, columnDefinition = "payment_method")
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
     private PaymentMethod method;
 
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, columnDefinition = "payment_status")
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
     private PaymentStatus status = PaymentStatus.PENDING;
