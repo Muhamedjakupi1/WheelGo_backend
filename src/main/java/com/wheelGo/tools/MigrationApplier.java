@@ -36,7 +36,7 @@ public final class MigrationApplier {
     private static void migratePublic(String url, String username, String password) {
         Flyway flyway = Flyway.configure()
                 .dataSource(url, username, password)
-                .locations("classpath:db/migration")
+                .locations("classpath:db/migration/public")
                 .schemas("public")
                 .defaultSchema("public")
                 .load();
@@ -56,7 +56,7 @@ public final class MigrationApplier {
             for (String schemaName : schemaNames) {
                 Flyway flyway = Flyway.configure()
                         .dataSource(url, username, password)
-                        .locations("classpath:db/tenant")
+                        .locations("classpath:db/migration/tenant")
                         .schemas(schemaName)
                         .defaultSchema(schemaName)
                         .table("flyway_schema_history")
