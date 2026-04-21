@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "maintenance_record")
+@Table(name = "maintenance_records")
 @Getter @Setter
 public class MaintenanceRecord {
     @Id
@@ -25,7 +25,7 @@ public class MaintenanceRecord {
     @JoinColumn(name = "vehicle_id", nullable = false)
     private Vehicle vehicle;
 
-    @Column(nullable = false, length = 60)
+    @Column(nullable = false, columnDefinition = "maintenance_type")
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
     private MaintenanceType type;

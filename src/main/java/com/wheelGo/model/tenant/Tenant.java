@@ -27,7 +27,7 @@ public class Tenant {
     @Column(name = "schema_name", nullable = false, unique = true)
     private String schemaName;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "public.tenant_plan")
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
     private Plan plan = Plan.FREE;

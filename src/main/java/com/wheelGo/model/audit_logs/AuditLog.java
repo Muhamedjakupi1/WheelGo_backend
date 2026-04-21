@@ -25,7 +25,7 @@ public class AuditLog {
     @Column(name = "user_id")
     private UUID userId;
 
-    @Column(nullable = false, length = 60)
+    @Column(nullable = false, columnDefinition = "audit_action")
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
     private AuditAction action;

@@ -31,12 +31,12 @@ public class SupportTicket {
     @Column (name = "subject", nullable = false, length = 150)
     private String subject;
 
-    @Column (name = "status", nullable = false, length = 20)
+    @Column (name = "status", nullable = false, columnDefinition = "ticket_status")
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
     private TicketStatus status = TicketStatus.OPEN;
 
-    @Column (name = "priority", nullable = false, length = 20)
+    @Column (name = "priority", nullable = false, columnDefinition = "ticket_priority")
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
     private TicketPriority priority = TicketPriority.NORMAL;

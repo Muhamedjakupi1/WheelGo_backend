@@ -31,7 +31,7 @@ public class Notification {
     @Column (name = "body", nullable = false)
     private String body;
 
-    @Column (name = "channel", nullable = false, length = 20)
+    @Column (name = "channel", nullable = false, columnDefinition = "notification_channel")
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
     private NotificationChannel channel = NotificationChannel.EMAIL;
