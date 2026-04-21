@@ -14,16 +14,16 @@ This writes:
 
 Tenant schema migration flow:
 
-- On app startup, Flyway migrates the shared `public` schema from `src/main/resources/db/migration`.
-- Then `TenantSchemaStartupMigrator` loads all rows from `public.tenants` and applies `src/main/resources/db/tenant` to each tenant schema.
+- On app startup, Flyway migrates the shared `public` schema from `src/main/resources/db/migration/public`.
+- Then `TenantSchemaStartupMigrator` loads all rows from `public.tenants` and applies `src/main/resources/db/migration/tenant` to each tenant schema.
 - When a new tenant is created, `TenantSchemaService.createSchemaForTenant(...)` creates the schema and applies the same tenant migrations immediately.
 
 When entities change:
 
 1. Update the entity classes.
 2. Create a new SQL migration under:
-   - `src/main/resources/db/migration` for shared `public` objects
-   - `src/main/resources/db/tenant` for tenant-owned objects
+   - `src/main/resources/db/migration/public` for shared `public` objects
+   - `src/main/resources/db/migration/tenant` for tenant-owned objects
 3. Restart the app.
 4. Shared migrations run once on `public`, and tenant migrations run for every schema listed in `public.tenants`.
 
@@ -42,8 +42,8 @@ To generate and apply immediately without relying on app restart:
 ```
 
 This compares the current entities against the current PostgreSQL database and writes new Flyway files into:
-- `src/main/resources/db/migration` for `public` tables
-- `src/main/resources/db/tenant` for tenant tables
+- `src/main/resources/db/migration/public` for `public` tables
+- `src/main/resources/db/migration/tenant` for tenant tables
 
 Notes:
 - It is designed for additive changes such as new columns, new tables, new single-column unique constraints, and new foreign keys.

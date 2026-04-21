@@ -4,4 +4,3 @@
 
 ALTER TABLE public.users
     DROP COLUMN age_fake;
-

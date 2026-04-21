@@ -16,7 +16,7 @@ import java.util.List;
 @AllArgsConstructor
 public class TenantSchemaService {
 
-    private static final String TENANT_MIGRATION_LOCATION = "classpath:db/tenant";
+    private static final String TENANT_MIGRATION_LOCATION = "classpath:db/migration/tenant";
     private static final String TENANT_HISTORY_TABLE = "flyway_schema_history";
 
     private final DataSource dataSource;

@@ -46,8 +46,8 @@ public final class MigrationScaffoldGenerator {
 
     private static final Path CLASSES_ROOT = Paths.get("target", "classes", "com", "wheelGo", "model");
     private static final Path APP_PROPERTIES = Paths.get("src", "main", "resources", "application.properties");
-    private static final Path PUBLIC_MIGRATIONS = Paths.get("src", "main", "resources", "db", "migration");
-    private static final Path TENANT_MIGRATIONS = Paths.get("src", "main", "resources", "db", "tenant");
+    private static final Path PUBLIC_MIGRATIONS = Paths.get("src", "main", "resources", "db", "migration", "public");
+    private static final Path TENANT_MIGRATIONS = Paths.get("src", "main", "resources", "db", "migration", "tenant");
     private static final Pattern VERSION_PATTERN = Pattern.compile("^V(\\d+)__.*\\.sql$");
 
     private MigrationScaffoldGenerator() {
