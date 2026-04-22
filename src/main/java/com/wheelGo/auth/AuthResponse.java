@@ -1,4 +1,4 @@
-package com.wheelGo.schema;
+package com.wheelGo.auth;
 
 import java.util.UUID;
 
