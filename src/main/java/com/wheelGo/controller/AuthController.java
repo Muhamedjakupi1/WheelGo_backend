@@ -17,10 +17,15 @@ public class AuthController {
         this.authService = authService;
     }
 
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody AuthLoginRequest req) {
+    @PostMapping("/login/{tenantSlug}")
+    public ResponseEntity<?> login(@PathVariable String tenantSlug, @RequestBody AuthLoginRequest req) {
         try {
-            return ResponseEntity.ok(authService.login(req));
+           AuthLoginRequest request = new AuthLoginRequest(
+                   req.email(),
+                   req.password(),
+                   tenantSlug
+           );
+           return ResponseEntity.ok(authService.login(request));
         } catch (RuntimeException e) {
             return ResponseEntity.status(401).body(e.getMessage());
         }
