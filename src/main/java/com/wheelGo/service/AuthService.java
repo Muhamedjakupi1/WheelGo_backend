@@ -10,26 +10,18 @@ import com.wheelGo.auth.AuthResponse;
 import com.wheelGo.auth.AuthSignUpRequest;
 import com.wheelGo.security.CustomUserPrincipal;
 import com.wheelGo.security.JwtUtils;
+import lombok.AllArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
+@AllArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
     private final TenantRepository tenantRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
-
-    public AuthService(UserRepository userRepository,
-                       TenantRepository tenantRepository,
-                       PasswordEncoder passwordEncoder,
-                       JwtUtils jwtUtils) {
-        this.userRepository = userRepository;
-        this.tenantRepository = tenantRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.jwtUtils = jwtUtils;
-    }
 
     public AuthResponse login(AuthLoginRequest req) {
         User user = userRepository.findByEmail(req.email())
