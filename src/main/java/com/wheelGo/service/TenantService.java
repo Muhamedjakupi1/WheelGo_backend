@@ -2,16 +2,15 @@ package com.wheelGo.service;
 
 import com.wheelGo.mapper.TenantMapper;
 import com.wheelGo.model.enums.Role;
-import com.wheelGo.model.tenant.CreateTenantRequest;
+import com.wheelGo.model.tenant.TenantRequest;
 import com.wheelGo.model.tenant.Tenant;
 import com.wheelGo.model.tenant.TenantResponse;
-import com.wheelGo.model.tenant.UpdateTenantRequest;
+import com.wheelGo.model.tenant.TenantUpdateRequest;
 import com.wheelGo.model.user.User;
 import com.wheelGo.repository.TenantRepository;
 import com.wheelGo.repository.UserRepository;
 import com.wheelGo.schema.TenantSchemaService;
 import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -34,7 +33,7 @@ public class TenantService {
     private final PasswordEncoder passwordEncoder;
 
     @Transactional
-    public TenantResponse createTenant(CreateTenantRequest req) {
+    public TenantResponse createTenant(TenantRequest req) {
         String normalizedSlug = normalizeSlug(req.getSlug());
 
         if (normalizedSlug == null || normalizedSlug.isBlank()) {
@@ -93,7 +92,7 @@ public class TenantService {
     }
 
     @Transactional
-    public TenantResponse updateTenant(UUID id, UpdateTenantRequest req) {
+    public TenantResponse updateTenant(UUID id, TenantUpdateRequest req) {
         Tenant tenant = tenantRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tenant not found."));
 
