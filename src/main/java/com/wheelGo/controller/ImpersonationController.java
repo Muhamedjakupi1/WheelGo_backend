@@ -3,7 +3,7 @@ package com.wheelGo.controller;
 import com.wheelGo.model.user.User;
 import com.wheelGo.repository.TenantRepository;
 import com.wheelGo.repository.UserRepository;
-import com.wheelGo.schema.AuthResponse;
+import com.wheelGo.auth.AuthResponse;
 import com.wheelGo.security.CustomUserPrincipal;
 import com.wheelGo.security.JwtUtils;
 import org.springframework.http.ResponseEntity;
