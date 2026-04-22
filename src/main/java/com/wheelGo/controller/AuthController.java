@@ -1,7 +1,7 @@
 package com.wheelGo.controller;
 
-import com.wheelGo.schema.AuthLoginRequest;
-import com.wheelGo.schema.AuthSignUpRequest;
+import com.wheelGo.auth.AuthLoginRequest;
+import com.wheelGo.auth.AuthSignUpRequest;
 import com.wheelGo.service.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
