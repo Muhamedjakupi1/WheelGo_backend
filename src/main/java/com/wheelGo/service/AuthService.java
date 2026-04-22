@@ -32,20 +32,33 @@ public class AuthService {
     }
 
     public AuthResponse login(AuthLoginRequest req) {
-        User user = userRepository.findByEmail(req.email())
-                .orElseThrow(() -> new RuntimeException("Invalid credentials"));
+       Tenant tenant = tenantRepository.findBySlug(req.tenantSlug()).orElseThrow(
+               () -> new RuntimeException("Tenant not found")
+       );
 
-        if (!user.isActive()) {
+        if (!tenant.isActive()) {
+            throw new RuntimeException("Tenant account is inactive");
+        }
+
+        User user = userRepository.findByEmail(req.email().trim().toLowerCase()).orElseThrow(
+                ()->new RuntimeException("Invalid credentials")
+        );
+
+        if(user.getTenant() == null || !user.getTenant().getId().equals(tenant.getId())) {
+            throw new RuntimeException("Invalid credentials for this tenant");
+        }
+
+        if(!user.isActive()){
             throw new RuntimeException("User account is inactive");
         }
 
-        if (!passwordEncoder.matches(req.password(), user.getPasswordHash())) {
+        if(!passwordEncoder.matches(req.password(), user.getPasswordHash())){
             throw new RuntimeException("Invalid credentials");
         }
 
-        Tenant tenant = user.getTenant();
-        String tenantSlug = tenant != null ? tenant.getSlug() : null;
-        var tenantId = tenant != null ? tenant.getId() : null;
+
+       String tenantSlug = tenant.getSlug();
+        var tenantId = tenant.getId();
 
         CustomUserPrincipal principal = new CustomUserPrincipal(
                 user.getId(),
