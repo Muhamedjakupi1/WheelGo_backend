@@ -1,7 +1,7 @@
 package com.wheelGo.controller;
 
 
-import com.wheelGo.model.invoices.CreateInvoiceRequest;
+import com.wheelGo.model.invoices.InvoiceRequest;
 import com.wheelGo.model.invoices.InvoiceResponse;
 import com.wheelGo.service.InvoiceService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,7 +24,7 @@ public class InvoiceController {
 
     @PostMapping
     @Operation(summary = "Create Invoice")
-    public ResponseEntity<InvoiceResponse> create(@RequestBody @Valid CreateInvoiceRequest request) {
+    public ResponseEntity<InvoiceResponse> create(@RequestBody @Valid InvoiceRequest request) {
         return ResponseEntity.ok(invoicesService.createInvoice(request));
     }
 }

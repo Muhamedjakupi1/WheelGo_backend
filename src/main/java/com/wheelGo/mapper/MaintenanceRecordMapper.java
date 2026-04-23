@@ -1,7 +1,7 @@
 package com.wheelGo.mapper;
 
-import com.wheelGo.model.maintenanceRecords.MaintenanceRecord;
-import com.wheelGo.model.maintenanceRecords.MaintenanceRecordResponse;
+import com.wheelGo.model.maintenancerecords.MaintenanceRecord;
+import com.wheelGo.model.maintenancerecords.MaintenanceRecordResponse;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")

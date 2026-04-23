@@ -1,7 +1,7 @@
 package com.wheelGo.mapper;
 
-import com.wheelGo.model.tenantSettings.TenantSettings;
-import com.wheelGo.model.tenantSettings.TenantSettingsResponse;
+import com.wheelGo.model.tenantsettings.TenantSettings;
+import com.wheelGo.model.tenantsettings.TenantSettingsResponse;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")
