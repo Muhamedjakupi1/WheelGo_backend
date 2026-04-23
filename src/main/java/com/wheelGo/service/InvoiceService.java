@@ -1,7 +1,7 @@
 package com.wheelGo.service;
 
 import com.wheelGo.mapper.InvoiceMapper; // Shto këtë import
-import com.wheelGo.model.invoices.CreateInvoiceRequest;
+import com.wheelGo.model.invoices.InvoiceRequest;
 import com.wheelGo.model.invoices.Invoice;
 import com.wheelGo.model.invoices.InvoiceResponse; // Shto këtë import
 import com.wheelGo.repository.InvoiceRepository;
@@ -23,7 +23,7 @@ public class InvoiceService {
     private final InvoiceMapper invoiceMapper;
 
     @Transactional
-    public InvoiceResponse createInvoice(CreateInvoiceRequest request) {
+    public InvoiceResponse createInvoice(InvoiceRequest request) {
         invoicesRepository.findByBookingId(request.getBookingID())
                 .ifPresent(i -> {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The invoice for this booking already exists!");
