@@ -1,7 +1,7 @@
 package com.wheelGo.mapper;
 
-import com.wheelGo.model.chatmessages.ChatMessage;
-import com.wheelGo.model.chatmessages.ChatMessageResponse;
+import com.wheelGo.model.chat_messages.ChatMessage;
+import com.wheelGo.model.chat_messages.ChatMessageResponse;
 
 import org.mapstruct.Mapper;
 

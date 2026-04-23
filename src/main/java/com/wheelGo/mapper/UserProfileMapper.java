@@ -1,8 +1,8 @@
 package com.wheelGo.mapper;
 
 
-import com.wheelGo.model.userprofiles.UserProfile;
-import com.wheelGo.model.userprofiles.UserProfileResponse;
+import com.wheelGo.model.user_profiles.UserProfile;
+import com.wheelGo.model.user_profiles.UserProfileResponse;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")
