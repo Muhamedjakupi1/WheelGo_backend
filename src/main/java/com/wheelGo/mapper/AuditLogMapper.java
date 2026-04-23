@@ -1,7 +1,7 @@
 package com.wheelGo.mapper;
 
-import com.wheelGo.model.auditlogs.AuditLog;
-import com.wheelGo.model.auditlogs.AuditLogResponse;
+import com.wheelGo.model.audit_logs.AuditLog;
+import com.wheelGo.model.audit_logs.AuditLogResponse;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")

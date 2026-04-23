@@ -1,7 +1,7 @@
 package com.wheelGo.mapper;
 
-import com.wheelGo.model.chatsessions.ChatSession;
-import com.wheelGo.model.chatsessions.ChatSessionResponse;
+import com.wheelGo.model.chat_sessions.ChatSession;
+import com.wheelGo.model.chat_sessions.ChatSessionResponse;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")

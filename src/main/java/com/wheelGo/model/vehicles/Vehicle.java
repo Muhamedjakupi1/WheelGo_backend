@@ -4,7 +4,7 @@ import com.wheelGo.model.enums.FuelType;
 import com.wheelGo.model.enums.Transmission;
 import com.wheelGo.model.enums.VehicleStatus;
 import com.wheelGo.model.locations.Location;
-import com.wheelGo.model.vehiclecategories.VehicleCategory;
+import com.wheelGo.model.vehicle_categories.VehicleCategory;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
