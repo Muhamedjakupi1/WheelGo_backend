@@ -1,7 +1,7 @@
 package com.wheelGo.mapper;
 
-import com.wheelGo.model.vehicleCategories.VehicleCategory;
-import com.wheelGo.model.vehicleCategories.VehicleCategoryResponse;
+import com.wheelGo.model.vehiclecategories.VehicleCategory;
+import com.wheelGo.model.vehiclecategories.VehicleCategoryResponse;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")

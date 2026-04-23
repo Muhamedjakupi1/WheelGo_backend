@@ -1,9 +1,9 @@
 package com.wheelGo.controller;
 
-import com.wheelGo.model.tenant.CreateTenantRequest;
+import com.wheelGo.model.tenant.TenantRequest;
 import com.wheelGo.model.tenant.Tenant;
 import com.wheelGo.model.tenant.TenantResponse;
-import com.wheelGo.model.tenant.UpdateTenantRequest;
+import com.wheelGo.model.tenant.TenantUpdateRequest;
 import com.wheelGo.service.TenantService;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
@@ -22,7 +22,7 @@ public class TenantController {
     private final TenantService tenantService;
 
     @PostMapping
-    public ResponseEntity<TenantResponse> create(@RequestBody @Valid CreateTenantRequest request) {
+    public ResponseEntity<TenantResponse> create(@RequestBody @Valid TenantRequest request) {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(tenantService.createTenant(request));
@@ -30,7 +30,7 @@ public class TenantController {
 
     @PatchMapping("/{id}")
     public ResponseEntity<TenantResponse> update(@PathVariable UUID id,
-                                                 @RequestBody UpdateTenantRequest request) {
+                                                 @RequestBody TenantUpdateRequest request) {
         return ResponseEntity.ok(tenantService.updateTenant(id, request));
     }
 
