@@ -1,4 +1,4 @@
-package com.wheelGo.model.chatmessages;
+package com.wheelGo.model.chatMessages;
 
 
 import com.wheelGo.model.enums.ChatRole;

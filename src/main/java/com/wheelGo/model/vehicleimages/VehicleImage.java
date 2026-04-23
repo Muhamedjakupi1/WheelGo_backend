@@ -1,4 +1,4 @@
-package com.wheelGo.model.vehicleimages;
+package com.wheelGo.model.vehicleImages;
 
 import com.wheelGo.model.vehicles.Vehicle;
 import jakarta.persistence.*;

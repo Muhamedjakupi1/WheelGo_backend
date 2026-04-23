@@ -1,4 +1,4 @@
-package com.wheelGo.model.chatsessions;
+package com.wheelGo.model.chatSessions;
 
 import lombok.Getter;
 import lombok.Setter;

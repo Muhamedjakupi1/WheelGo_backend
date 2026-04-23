@@ -1,4 +1,4 @@
-package com.wheelGo.model.userprofiles;
+package com.wheelGo.model.userProfiles;
 
 import com.wheelGo.model.user.User;
 import jakarta.persistence.*;

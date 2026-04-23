@@ -1,4 +1,4 @@
-package com.wheelGo.model.driverlicenses;
+package com.wheelGo.model.driverLicenses;
 
 import lombok.Getter;
 import lombok.Setter;

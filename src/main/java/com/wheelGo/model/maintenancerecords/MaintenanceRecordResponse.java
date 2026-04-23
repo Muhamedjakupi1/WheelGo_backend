@@ -1,6 +1,9 @@
-package com.wheelGo.model.maintenancerecords;
+package com.wheelGo.model.maintenanceRecords;
 
 import com.wheelGo.model.enums.MaintenanceType;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Getter;
 import lombok.Setter;
 

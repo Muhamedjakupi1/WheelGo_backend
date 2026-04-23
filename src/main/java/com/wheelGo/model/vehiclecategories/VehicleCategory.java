@@ -1,4 +1,4 @@
-package com.wheelGo.model.vehiclecategories;
+package com.wheelGo.model.vehicleCategories;
 
 import jakarta.persistence.*;
 import lombok.Getter;
