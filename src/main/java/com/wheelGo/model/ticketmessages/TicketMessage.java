@@ -1,4 +1,4 @@
-package com.wheelGo.model.ticketmessages;
+package com.wheelGo.model.ticketMessages;
 
 import jakarta.persistence.*;
 import lombok.Getter;

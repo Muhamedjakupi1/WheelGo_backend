@@ -1,4 +1,4 @@
-package com.wheelGo.model.driverlicenses;
+package com.wheelGo.model.driverLicenses;
 
 import com.wheelGo.model.user.User;
 import jakarta.persistence.*;

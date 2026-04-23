@@ -1,4 +1,4 @@
-package com.wheelGo.model.supporttickets;
+package com.wheelGo.model.supportTickets;
 
 
 import com.wheelGo.model.enums.TicketPriority;

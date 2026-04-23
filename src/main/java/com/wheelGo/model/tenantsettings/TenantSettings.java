@@ -1,4 +1,4 @@
-package com.wheelGo.model.tenantsettings;
+package com.wheelGo.model.tenantSettings;
 
 import jakarta.persistence.*;
 import lombok.*;

@@ -1,4 +1,4 @@
-package com.wheelGo.model.userprofiles;
+package com.wheelGo.model.userProfiles;
 
 import lombok.Getter;
 import lombok.Setter;

@@ -1,4 +1,4 @@
-package com.wheelGo.model.tenantsettings;
+package com.wheelGo.model.tenantSettings;
 
 import lombok.Getter;
 import lombok.Setter;

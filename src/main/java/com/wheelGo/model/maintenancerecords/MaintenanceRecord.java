@@ -1,4 +1,4 @@
-package com.wheelGo.model.maintenancerecords;
+package com.wheelGo.model.maintenanceRecords;
 
 import com.wheelGo.model.enums.MaintenanceType;
 import com.wheelGo.model.vehicles.Vehicle;
