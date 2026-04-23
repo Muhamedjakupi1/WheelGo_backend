@@ -24,41 +24,33 @@ public class AuthService {
     private final JwtUtils jwtUtils;
 
     public AuthResponse login(AuthLoginRequest req) {
-       Tenant tenant = tenantRepository.findBySlug(req.tenantSlug()).orElseThrow(
-               () -> new RuntimeException("Tenant not found")
-       );
+
+        Tenant tenant = tenantRepository.findBySlug(req.tenantSlug())
+                .orElseThrow(() -> new RuntimeException("Tenant not found"));
 
         if (!tenant.isActive()) {
             throw new RuntimeException("Tenant account is inactive");
         }
 
-        User user = userRepository.findByEmail(req.email().trim().toLowerCase()).orElseThrow(
-                ()->new RuntimeException("Invalid credentials")
-        );
+        User user = userRepository
+                .findByEmailAndTenantId(req.email().trim().toLowerCase(), tenant.getId())
+                .orElseThrow(() -> new RuntimeException("Invalid credentials"));
 
-        if(user.getTenant() == null || !user.getTenant().getId().equals(tenant.getId())) {
-            throw new RuntimeException("Invalid credentials for this tenant");
-        }
-
-        if(!user.isActive()){
+        if (!user.isActive()) {
             throw new RuntimeException("User account is inactive");
         }
 
-        if(!passwordEncoder.matches(req.password(), user.getPasswordHash())){
+        if (!passwordEncoder.matches(req.password(), user.getPasswordHash())) {
             throw new RuntimeException("Invalid credentials");
         }
-
-
-       String tenantSlug = tenant.getSlug();
-        var tenantId = tenant.getId();
 
         CustomUserPrincipal principal = new CustomUserPrincipal(
                 user.getId(),
                 user.getEmail(),
                 user.getPasswordHash(),
                 user.getRole().name(),
-                tenantId,
-                tenantSlug,
+                tenant.getId(),
+                tenant.getSlug(),
                 false,
                 null,
                 null
@@ -71,8 +63,8 @@ public class AuthService {
                 user.getEmail(),
                 user.getRole().name(),
                 user.getId(),
-                tenantId,
-                tenantSlug,
+                tenant.getId(),
+                tenant.getSlug(),
                 false,
                 null,
                 null
@@ -80,6 +72,7 @@ public class AuthService {
     }
 
     public AuthResponse signup(AuthSignUpRequest req) {
+
         Tenant tenant = tenantRepository.findBySlug(req.tenantSlug())
                 .orElseThrow(() -> new RuntimeException("Tenant not found"));
 
@@ -87,8 +80,8 @@ public class AuthService {
             throw new RuntimeException("Tenant is inactive");
         }
 
-        if (userRepository.existsByEmail(req.email())) {
-            throw new RuntimeException("Email already exists");
+        if (userRepository.existsByEmailAndTenantId(req.email().trim().toLowerCase(), tenant.getId())) {
+            throw new RuntimeException("User already exists in this tenant");
         }
 
         User user = new User();

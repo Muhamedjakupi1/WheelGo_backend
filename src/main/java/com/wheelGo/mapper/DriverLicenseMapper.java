@@ -1,7 +1,7 @@
 package com.wheelGo.mapper;
 
-import com.wheelGo.model.driverLicenses.DriverLicense;
-import com.wheelGo.model.driverLicenses.DriverLicenseResponse;
+import com.wheelGo.model.driverlicenses.DriverLicense;
+import com.wheelGo.model.driverlicenses.DriverLicenseResponse;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")

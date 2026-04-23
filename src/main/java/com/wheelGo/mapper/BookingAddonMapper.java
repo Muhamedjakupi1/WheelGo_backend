@@ -1,7 +1,7 @@
 package com.wheelGo.mapper;
 
-import com.wheelGo.model.booking_addons.BookingAddon;
-import com.wheelGo.model.booking_addons.BookingAddonResponse;
+import com.wheelGo.model.bookingaddons.BookingAddon;
+import com.wheelGo.model.bookingaddons.BookingAddonResponse;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")
