@@ -1,13 +1,14 @@
 package com.wheelGo.service;
 
-import com.wheelGo.model.tenant.Tenant;
-import com.wheelGo.model.user.User;
-import com.wheelGo.model.enums.Role;
-import com.wheelGo.repository.TenantRepository;
-import com.wheelGo.repository.UserRepository;
 import com.wheelGo.auth.AuthLoginRequest;
 import com.wheelGo.auth.AuthResponse;
 import com.wheelGo.auth.AuthSignUpRequest;
+import com.wheelGo.model.enums.AuditAction;
+import com.wheelGo.model.enums.Role;
+import com.wheelGo.model.tenant.Tenant;
+import com.wheelGo.model.user.User;
+import com.wheelGo.repository.TenantRepository;
+import com.wheelGo.repository.UserRepository;
 import com.wheelGo.security.CustomUserPrincipal;
 import com.wheelGo.security.JwtUtils;
 import lombok.AllArgsConstructor;
@@ -22,6 +23,7 @@ public class AuthService {
     private final TenantRepository tenantRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
+    private final AuditLogService auditLogService;
 
     public AuthResponse login(AuthLoginRequest req) {
 
@@ -58,6 +60,8 @@ public class AuthService {
 
         String token = jwtUtils.generateToken(principal);
 
+        auditLogService.logForSchema(tenant.getSchemaName(), user.getId(), AuditAction.LOGIN, "User", user.getId(), null, user);
+
         return new AuthResponse(
                 token,
                 user.getEmail(),
@@ -93,6 +97,8 @@ public class AuthService {
         user.setEmailVerified(true);
 
         User saved = userRepository.save(user);
+
+        auditLogService.logForSchema(tenant.getSchemaName(), saved.getId(), AuditAction.CREATE, "User", saved.getId(), null, saved);
 
         CustomUserPrincipal principal = new CustomUserPrincipal(
                 saved.getId(),
