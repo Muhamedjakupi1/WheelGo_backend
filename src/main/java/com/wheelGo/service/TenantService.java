@@ -1,14 +1,16 @@
 package com.wheelGo.service;
 
 import com.wheelGo.mapper.TenantMapper;
+import com.wheelGo.model.enums.AuditAction;
 import com.wheelGo.model.enums.Role;
-import com.wheelGo.model.tenant.TenantRequest;
 import com.wheelGo.model.tenant.Tenant;
+import com.wheelGo.model.tenant.TenantRequest;
 import com.wheelGo.model.tenant.TenantResponse;
 import com.wheelGo.model.tenant.TenantUpdateRequest;
 import com.wheelGo.model.user.User;
 import com.wheelGo.repository.TenantRepository;
 import com.wheelGo.repository.UserRepository;
+import com.wheelGo.schema.TenantContext;
 import com.wheelGo.schema.TenantSchemaService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +33,7 @@ public class TenantService {
     private final TenantMapper tenantMapper;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuditLogService auditLogService;
 
     @Transactional
     public TenantResponse createTenant(TenantRequest req) {
@@ -69,6 +72,9 @@ public class TenantService {
 
         userRepository.save(adminUser);
 
+        TenantContext.runWithSchema(savedTenant.getSchemaName(),
+                () -> auditLogService.log(AuditAction.CREATE, "Tenant", savedTenant.getId(), null, savedTenant));
+
         log.info("Tenant '{}' was created with schema '{}' and admin '{}'.",
                 savedTenant.getSlug(), schemaName, adminUser.getEmail());
 
@@ -84,6 +90,11 @@ public class TenantService {
         Tenant tenant = tenantRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tenant not found."));
 
+        Tenant oldTenant = copyTenant(tenant);
+
+        TenantContext.runWithSchema(tenant.getSchemaName(),
+                () -> auditLogService.log(AuditAction.DELETE, "Tenant", oldTenant.getId(), oldTenant, null));
+
         schemaService.dropSchemaForTenant(tenant.getSchemaName());
         tenantRepository.delete(tenant);
 
@@ -95,6 +106,8 @@ public class TenantService {
     public TenantResponse updateTenant(UUID id, TenantUpdateRequest req) {
         Tenant tenant = tenantRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Tenant not found."));
+
+        Tenant oldTenant = copyTenant(tenant);
 
         if (req.getName() != null && !req.getName().isBlank()) {
             tenant.setName(req.getName().trim());
@@ -110,7 +123,22 @@ public class TenantService {
 
         tenant.setUpdatedAt(LocalDateTime.now());
         Tenant updated = tenantRepository.save(tenant);
+        TenantContext.runWithSchema(updated.getSchemaName(),
+                () -> auditLogService.log(AuditAction.UPDATE, "Tenant", updated.getId(), oldTenant, updated));
         return tenantMapper.toResponse(updated);
+    }
+
+    private Tenant copyTenant(Tenant tenant) {
+        Tenant copy = new Tenant();
+        copy.setId(tenant.getId());
+        copy.setName(tenant.getName());
+        copy.setSlug(tenant.getSlug());
+        copy.setSchemaName(tenant.getSchemaName());
+        copy.setPlan(tenant.getPlan());
+        copy.setActive(tenant.isActive());
+        copy.setCreatedAt(tenant.getCreatedAt());
+        copy.setUpdatedAt(tenant.getUpdatedAt());
+        return copy;
     }
 
     private String normalizeSlug(String value) {
