@@ -49,6 +49,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/public/**",
+                                "/uploads/**",
                                 // Added the missing /api-docs paths:
                                 "/api-docs",
                                 "/api-docs/**",
