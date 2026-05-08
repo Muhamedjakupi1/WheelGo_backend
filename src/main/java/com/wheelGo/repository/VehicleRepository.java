@@ -8,6 +8,9 @@ import java.util.UUID;
 
 public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
     List<Vehicle> findAllByOrderByCreatedAtDesc();
+
+    boolean existsByCategory_Id(UUID categoryId);
+
     boolean existsByPlateNumberIgnoreCase(String plateNumber);
     boolean existsByPlateNumberIgnoreCaseAndIdNot(String plateNumber, UUID id);
     boolean existsByVinIgnoreCase(String vin);

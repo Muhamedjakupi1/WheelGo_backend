@@ -1,12 +1,10 @@
 package com.wheelGo.controller;
 
-import com.wheelGo.model.vehicle_images.VehicleImageRequest;
 import com.wheelGo.model.vehicle_images.VehicleImageResponse;
-import com.wheelGo.model.vehicle_images.VehicleImagesUpdateRequest;
 import com.wheelGo.service.VehicleImageAdminService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -33,12 +31,7 @@ public class VehicleImageAdminController {
         return ResponseEntity.ok(vehicleImageAdminService.getById(id));
     }
 
-    @PostMapping
-    public ResponseEntity<VehicleImageResponse> create(@RequestBody @Valid VehicleImageRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(vehicleImageAdminService.create(request));
-    }
-
-    @PostMapping(value = "/upload", consumes = "multipart/form-data")
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<VehicleImageResponse> upload(@RequestParam UUID vehicleId,
                                                        @RequestParam MultipartFile file,
                                                        @RequestParam(defaultValue = "false") boolean isPrimary) {
@@ -46,10 +39,11 @@ public class VehicleImageAdminController {
                 .body(vehicleImageAdminService.createFromUpload(vehicleId, file, isPrimary));
     }
 
-    @PatchMapping("/{id}")
+    @PatchMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<VehicleImageResponse> update(@PathVariable UUID id,
-                                                       @RequestBody VehicleImagesUpdateRequest request) {
-        return ResponseEntity.ok(vehicleImageAdminService.update(id, request));
+                                                       @RequestParam(value = "file", required = false) MultipartFile file,
+                                                       @RequestParam(value = "isPrimary", required = false) Boolean isPrimary) {
+        return ResponseEntity.ok(vehicleImageAdminService.update(id, file, isPrimary));
     }
 
     @DeleteMapping("/{id}")
