@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 @Getter @Setter
@@ -21,10 +22,13 @@ public class VehicleResponse {
     private String model;
     private Short year;
     private String color;
+    private String vin;
     private FuelType fuelType;
     private Transmission transmission;
     private Short seats;
     private BigDecimal dailyRate;
     private VehicleStatus status;
     private Integer mileage;
+    private String primaryImageUrl;
+    private List<String> imageUrls;
 }

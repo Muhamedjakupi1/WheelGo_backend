@@ -1,7 +1,10 @@
 package com.wheelGo.model.vehicles;
 
+import com.wheelGo.model.enums.FuelType;
+import com.wheelGo.model.enums.Transmission;
 import com.wheelGo.model.enums.VehicleStatus;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Getter;
 import lombok.Setter;
@@ -13,15 +16,24 @@ import java.util.UUID;
 @Setter
 public class VehicleUpdateRequest {
 
-    private UUID locationid;  // duhet te shikohet edhe nje here
+    private UUID categoryId;
+    private UUID locationId;
+    private String plateNumber;
+    private String make;
+    private String model;
+
+    @Min(1900)
+    private Short year;
 
     private String color;
+    private String vin;
+    private FuelType fuelType;
+    private Transmission transmission;
+    private Short seats;
 
-
-    @PositiveOrZero(message = "Daily rate must be zero or positive")
+    @Positive(message = "Daily rate must be positive")
     private BigDecimal dailyRate;
 
-    @NotBlank(message = "Status is required")
     private VehicleStatus status;
 
     @PositiveOrZero(message = "Mileage cannot be negative")
