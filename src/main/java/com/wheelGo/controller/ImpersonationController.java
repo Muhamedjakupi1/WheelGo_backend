@@ -7,6 +7,7 @@ import com.wheelGo.auth.AuthResponse;
 import com.wheelGo.security.CustomUserPrincipal;
 import com.wheelGo.security.JwtUtils;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -29,6 +30,7 @@ public class ImpersonationController {
     }
 
     @PostMapping("/start/{tenantSlug}/{targetUserId}")
+    @PreAuthorize("hasRole('SUPER_ADMIN') and !principal.impersonating")
     public ResponseEntity<?> start(@PathVariable String tenantSlug,
                                    @PathVariable UUID targetUserId,
                                    @org.springframework.security.core.annotation.AuthenticationPrincipal CustomUserPrincipal superAdmin) {
@@ -71,6 +73,7 @@ public class ImpersonationController {
     }
 
     @PostMapping("/stop")
+    @PreAuthorize("isAuthenticated() and principal.impersonating")
     public ResponseEntity<?> stop(@org.springframework.security.core.annotation.AuthenticationPrincipal CustomUserPrincipal current) {
         if (!current.isImpersonating()) {
             return ResponseEntity.badRequest().body("Not currently impersonating");
