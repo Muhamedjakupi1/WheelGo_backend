@@ -49,7 +49,7 @@ public class FileStorageService {
                 Files.copy(inputStream, targetFile, StandardCopyOption.REPLACE_EXISTING);
             }
 
-            return "/src/main/vehicle-images/" + fileName;
+            return "/uploads/vehicle-images/" + fileName;
         } catch (IOException ex) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to store image file");
         }

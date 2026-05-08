@@ -1,9 +1,7 @@
 package com.wheelGo.service;
 
 import com.wheelGo.model.vehicle_images.VehicleImage;
-import com.wheelGo.model.vehicle_images.VehicleImageRequest;
 import com.wheelGo.model.vehicle_images.VehicleImageResponse;
-import com.wheelGo.model.vehicle_images.VehicleImagesUpdateRequest;
 import com.wheelGo.model.vehicles.Vehicle;
 import com.wheelGo.repository.VehicleImageRepository;
 import com.wheelGo.repository.VehicleRepository;
@@ -39,45 +37,36 @@ public class VehicleImageAdminService {
     }
 
     @Transactional
-    public VehicleImageResponse create(VehicleImageRequest request) {
-        Vehicle vehicle = findVehicle(request.getVehicleId());
-        if (request.isPrimary()) {
-            clearPrimaryFlag(vehicle.getId());
-        }
-
-        VehicleImage image = new VehicleImage();
-        image.setVehicle(vehicle);
-        image.setUrl(request.getUrl().trim());
-        image.setPrimary(request.isPrimary());
-        return toResponse(vehicleImageRepository.save(image));
-    }
-
-    @Transactional
     public VehicleImageResponse createFromUpload(UUID vehicleId, MultipartFile file, boolean isPrimary) {
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "An image file is required");
+        }
         String storedUrl = fileStorageService.storeVehicleImage(file);
-
-        VehicleImageRequest request = new VehicleImageRequest();
-        request.setVehicleId(vehicleId);
-        request.setUrl(storedUrl);
-        request.setPrimary(isPrimary);
-
-        return create(request);
+        Vehicle vehicle = findVehicle(vehicleId);
+        return toResponse(saveNewVehicleImageRow(vehicle, storedUrl, isPrimary));
     }
 
     @Transactional
-    public VehicleImageResponse update(UUID id, VehicleImagesUpdateRequest request) {
+    public VehicleImageResponse update(UUID id, MultipartFile file, Boolean isPrimary) {
         VehicleImage image = findImage(id);
+        boolean hasFile = file != null && !file.isEmpty();
 
-        if (request.getIsPrimary() != null && request.getIsPrimary()) {
-            clearPrimaryFlag(image.getVehicle().getId());
+        if (isPrimary == null && !hasFile) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Provide a replacement file and/or primary flag changes");
         }
 
-        if (request.getUrl() != null && !request.getUrl().isBlank()) {
-            image.setUrl(request.getUrl().trim());
+        if (hasFile) {
+            String storedUrl = fileStorageService.storeVehicleImage(file);
+            image.setUrl(storedUrl);
         }
 
-        if (request.getIsPrimary() != null) {
-            image.setPrimary(request.getIsPrimary());
+        if (isPrimary != null) {
+            if (Boolean.TRUE.equals(isPrimary)) {
+                clearPrimaryFlag(image.getVehicle().getId());
+                image.setPrimary(true);
+            } else {
+                image.setPrimary(false);
+            }
         }
 
         return toResponse(vehicleImageRepository.save(image));
@@ -86,6 +75,17 @@ public class VehicleImageAdminService {
     @Transactional
     public void delete(UUID id) {
         vehicleImageRepository.delete(findImage(id));
+    }
+
+    private VehicleImage saveNewVehicleImageRow(Vehicle vehicle, String url, boolean isPrimary) {
+        if (isPrimary) {
+            clearPrimaryFlag(vehicle.getId());
+        }
+        VehicleImage image = new VehicleImage();
+        image.setVehicle(vehicle);
+        image.setUrl(url.trim());
+        image.setPrimary(isPrimary);
+        return vehicleImageRepository.save(image);
     }
 
     private void clearPrimaryFlag(UUID vehicleId) {

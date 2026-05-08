@@ -5,6 +5,7 @@ import com.wheelGo.model.vehicle_categories.VehicleCategoryRequest;
 import com.wheelGo.model.vehicle_categories.VehicleCategoryResponse;
 import com.wheelGo.model.vehicle_categories.VehicleCategoryUpdateRequest;
 import com.wheelGo.repository.VehicleCategoryRepository;
+import com.wheelGo.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ import java.util.UUID;
 public class VehicleCategoryAdminService {
 
     private final VehicleCategoryRepository vehicleCategoryRepository;
+    private final VehicleRepository vehicleRepository;
 
     @Transactional(readOnly = true)
     public List<VehicleCategoryResponse> getAll() {
@@ -67,7 +69,14 @@ public class VehicleCategoryAdminService {
 
     @Transactional
     public void delete(UUID id) {
-        vehicleCategoryRepository.delete(findCategory(id));
+        findCategory(id);
+        if (vehicleRepository.existsByCategory_Id(id)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "This category cannot be deleted while vehicles are assigned to it. Reassign or remove those vehicles first."
+            );
+        }
+        vehicleCategoryRepository.deleteById(id);
     }
 
     private VehicleCategory findCategory(UUID id) {
