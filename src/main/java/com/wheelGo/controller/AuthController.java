@@ -2,9 +2,12 @@ package com.wheelGo.controller;
 
 import com.wheelGo.auth.AuthLoginRequest;
 import com.wheelGo.auth.AuthSignUpRequest;
+import com.wheelGo.security.ApiErrorResponse;
 import com.wheelGo.service.AuthService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -26,8 +29,10 @@ public class AuthController {
                    tenantSlug
            );
            return ResponseEntity.ok(authService.login(request));
+        } catch (ResponseStatusException e) {
+            return buildErrorResponse(HttpStatus.valueOf(e.getStatusCode().value()), e.getReason(), "/api/auth/login/" + tenantSlug);
         } catch (RuntimeException e) {
-            return ResponseEntity.status(401).body(e.getMessage());
+            return buildErrorResponse(HttpStatus.UNAUTHORIZED, e.getMessage(), "/api/auth/login/" + tenantSlug);
         }
     }
 
@@ -41,8 +46,20 @@ public class AuthController {
                     tenantSlug
             );
             return ResponseEntity.ok(authService.signup(request));
+        } catch (ResponseStatusException e) {
+            return buildErrorResponse(HttpStatus.valueOf(e.getStatusCode().value()), e.getReason(), "/api/auth/signup/" + tenantSlug);
         } catch (RuntimeException e) {
-            return ResponseEntity.status(400).body(e.getMessage());
+            return buildErrorResponse(HttpStatus.BAD_REQUEST, e.getMessage(), "/api/auth/signup/" + tenantSlug);
         }
+    }
+
+    private ResponseEntity<ApiErrorResponse> buildErrorResponse(HttpStatus status, String message, String path) {
+        return ResponseEntity.status(status)
+                .body(ApiErrorResponse.of(
+                        status.value(),
+                        status.getReasonPhrase(),
+                        message,
+                        path
+                ));
     }
 }
