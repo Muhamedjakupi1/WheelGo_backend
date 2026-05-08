@@ -8,6 +8,7 @@ import com.wheelGo.service.TenantService;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,6 +18,8 @@ import java.util.UUID;
 @RequestMapping("/api/super-admin/tenants")
 @CrossOrigin(origins = "http://localhost:5173")
 @AllArgsConstructor
+@PreAuthorize("hasAnyRole('SUPER_ADMIN')")
+
 public class TenantController {
 
     private final TenantService tenantService;
