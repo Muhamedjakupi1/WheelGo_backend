@@ -11,9 +11,13 @@ import com.wheelGo.repository.TenantRepository;
 import com.wheelGo.repository.UserRepository;
 import com.wheelGo.security.CustomUserPrincipal;
 import com.wheelGo.security.JwtUtils;
+import com.wheelGo.security.ReservedTenantSlugs;
 import lombok.AllArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+import static org.springframework.http.HttpStatus.FORBIDDEN;
 
 @Service
 @AllArgsConstructor
@@ -76,6 +80,9 @@ public class AuthService {
     }
 
     public AuthResponse signup(AuthSignUpRequest req) {
+        if (ReservedTenantSlugs.isReserved(req.tenantSlug())) {
+            throw new ResponseStatusException(FORBIDDEN, "Public signup is disabled for this tenant");
+        }
 
         Tenant tenant = tenantRepository.findBySlug(req.tenantSlug())
                 .orElseThrow(() -> new RuntimeException("Tenant not found"));
