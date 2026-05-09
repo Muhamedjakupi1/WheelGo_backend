@@ -40,6 +40,13 @@ public class TenantSchemaFilter extends OncePerRequestFilter {
         }
 
         String tenantSlug = principal.getTenantSlug();
+        if ("SUPER_ADMIN".equals(principal.getRole())) {
+            String requestedTenantSlug = requestTenantSlug();
+            if (requestedTenantSlug != null && !requestedTenantSlug.isBlank()) {
+                tenantSlug = requestedTenantSlug;
+            }
+        }
+
         if (tenantSlug == null || tenantSlug.isBlank()) {
             return;
         }
@@ -48,5 +55,11 @@ public class TenantSchemaFilter extends OncePerRequestFilter {
                 .map(tenant -> tenant.getSchemaName())
                 .filter(schemaName -> schemaName != null && !schemaName.isBlank())
                 .ifPresent(TenantContext::setCurrentSchema);
+    }
+
+    private String requestTenantSlug() {
+        return org.springframework.web.context.request.RequestContextHolder.getRequestAttributes() instanceof org.springframework.web.context.request.ServletRequestAttributes attrs
+                ? attrs.getRequest().getHeader("X-Tenant-Slug")
+                : null;
     }
 }

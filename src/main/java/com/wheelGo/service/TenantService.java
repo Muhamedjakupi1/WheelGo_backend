@@ -12,16 +12,20 @@ import com.wheelGo.repository.TenantRepository;
 import com.wheelGo.repository.UserRepository;
 import com.wheelGo.schema.TenantContext;
 import com.wheelGo.schema.TenantSchemaService;
+import com.wheelGo.security.ReservedTenantSlugs;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+
+import static org.springframework.http.HttpStatus.FORBIDDEN;
 
 @Service
 @Slf4j
@@ -41,6 +45,10 @@ public class TenantService {
 
         if (normalizedSlug == null || normalizedSlug.isBlank()) {
             throw new RuntimeException("Slug is required.");
+        }
+
+        if (ReservedTenantSlugs.isReserved(normalizedSlug)) {
+            throw new ResponseStatusException(FORBIDDEN, "This tenant slug is reserved.");
         }
 
         if (tenantRepository.existsBySlug(normalizedSlug)) {
