@@ -10,6 +10,7 @@ public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
     List<Vehicle> findAllByOrderByCreatedAtDesc();
 
     boolean existsByCategory_Id(UUID categoryId);
+    long countByCategory_Id(UUID categoryId);
 
     boolean existsByPlateNumberIgnoreCase(String plateNumber);
     boolean existsByPlateNumberIgnoreCaseAndIdNot(String plateNumber, UUID id);

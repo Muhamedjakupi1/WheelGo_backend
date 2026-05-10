@@ -7,6 +7,7 @@ import com.wheelGo.model.vehicle_categories.VehicleCategoryUpdateRequest;
 import com.wheelGo.repository.VehicleCategoryRepository;
 import com.wheelGo.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +19,9 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class VehicleCategoryAdminService {
+
+    private static final String CATEGORY_IN_USE_MESSAGE =
+            "You cannot delete this category because there is at least one vehicle attached to it.";
 
     private final VehicleCategoryRepository vehicleCategoryRepository;
     private final VehicleRepository vehicleRepository;
@@ -70,13 +74,17 @@ public class VehicleCategoryAdminService {
     @Transactional
     public void delete(UUID id) {
         findCategory(id);
-        if (vehicleRepository.existsByCategory_Id(id)) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "This category cannot be deleted while vehicles are assigned to it. Reassign or remove those vehicles first."
-            );
+        long attachedVehicles = vehicleRepository.countByCategory_Id(id);
+        if (attachedVehicles > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, CATEGORY_IN_USE_MESSAGE);
         }
-        vehicleCategoryRepository.deleteById(id);
+
+        try {
+            vehicleCategoryRepository.deleteById(id);
+            vehicleCategoryRepository.flush();
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, CATEGORY_IN_USE_MESSAGE, ex);
+        }
     }
 
     private VehicleCategory findCategory(UUID id) {
