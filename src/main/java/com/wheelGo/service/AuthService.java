@@ -7,8 +7,11 @@ import com.wheelGo.model.enums.AuditAction;
 import com.wheelGo.model.enums.Role;
 import com.wheelGo.model.tenant.Tenant;
 import com.wheelGo.model.user.User;
+import com.wheelGo.model.user_profiles.UserProfile;
 import com.wheelGo.repository.TenantRepository;
+import com.wheelGo.repository.UserProfileRepository;
 import com.wheelGo.repository.UserRepository;
+import com.wheelGo.schema.TenantSchemaExecutor;
 import com.wheelGo.security.CustomUserPrincipal;
 import com.wheelGo.security.JwtUtils;
 import com.wheelGo.security.ReservedTenantSlugs;
@@ -28,6 +31,9 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
     private final AuditLogService auditLogService;
+    private final UserProfileRepository userProfileRepository;
+    private final TenantSchemaExecutor tenantSchemaExecutor;
+
 
     public AuthResponse login(AuthLoginRequest req) {
 
@@ -104,6 +110,14 @@ public class AuthService {
         user.setEmailVerified(true);
 
         User saved = userRepository.save(user);
+
+        tenantSchemaExecutor.runForTenant(tenant, () -> {
+            UserProfile profile = new UserProfile();
+            profile.setUser(saved);
+            profile.setFirstName("User");
+            profile.setLastName("User");
+            userProfileRepository.save(profile);
+        });
 
         auditLogService.logForSchema(tenant.getSchemaName(), saved.getId(), AuditAction.CREATE, "User", saved.getId(), null, saved);
 
