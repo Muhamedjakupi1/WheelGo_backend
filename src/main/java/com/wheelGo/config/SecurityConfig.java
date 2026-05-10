@@ -3,6 +3,7 @@ package com.wheelGo.config;
 import com.wheelGo.security.JwtAuthenticationFilter;
 import com.wheelGo.security.RestAccessDeniedHandler;
 import com.wheelGo.security.RestAuthenticationEntryPoint;
+import com.wheelGo.security.SwaggerDevAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -21,15 +22,18 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final SwaggerDevAuthenticationFilter swaggerDevAuthenticationFilter;
     private final TenantSchemaFilter tenantSchemaFilter;
     private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
     private final RestAccessDeniedHandler restAccessDeniedHandler;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          SwaggerDevAuthenticationFilter swaggerDevAuthenticationFilter,
                           TenantSchemaFilter tenantSchemaFilter,
                           RestAuthenticationEntryPoint restAuthenticationEntryPoint,
                           RestAccessDeniedHandler restAccessDeniedHandler) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.swaggerDevAuthenticationFilter = swaggerDevAuthenticationFilter;
         this.tenantSchemaFilter = tenantSchemaFilter;
         this.restAuthenticationEntryPoint = restAuthenticationEntryPoint;
         this.restAccessDeniedHandler = restAccessDeniedHandler;
@@ -49,6 +53,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/public/**",
+                                "/uploads/**",
                                 // Added the missing /api-docs paths:
                                 "/api-docs",
                                 "/api-docs/**",
@@ -61,7 +66,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/super-admin/**").hasRole("SUPER_ADMIN")
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(swaggerDevAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(jwtAuthenticationFilter, SwaggerDevAuthenticationFilter.class);
         http.addFilterAfter(tenantSchemaFilter, JwtAuthenticationFilter.class);
 
         return http.build();

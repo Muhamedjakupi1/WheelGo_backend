@@ -12,16 +12,22 @@ import com.wheelGo.repository.TenantRepository;
 import com.wheelGo.repository.UserRepository;
 import com.wheelGo.schema.TenantContext;
 import com.wheelGo.schema.TenantSchemaService;
+import com.wheelGo.security.ReservedTenantSlugs;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.FORBIDDEN;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
 @Slf4j
@@ -40,15 +46,15 @@ public class TenantService {
         String normalizedSlug = normalizeSlug(req.getSlug());
 
         if (normalizedSlug == null || normalizedSlug.isBlank()) {
-            throw new RuntimeException("Slug is required.");
+            throw new ResponseStatusException(BAD_REQUEST, "Slug is required.");
+        }
+
+        if (ReservedTenantSlugs.isReserved(normalizedSlug)) {
+            throw new ResponseStatusException(FORBIDDEN, "This tenant slug is reserved.");
         }
 
         if (tenantRepository.existsBySlug(normalizedSlug)) {
-            throw new RuntimeException("Slug '" + normalizedSlug + "' already exists.");
-        }
-
-        if (userRepository.existsByEmail(req.getAdminEmail().trim().toLowerCase())) {
-            throw new RuntimeException("Admin email already exists.");
+            throw new ResponseStatusException(BAD_REQUEST, "Tenant with slug '" + normalizedSlug + "' already exists.");
         }
 
         String schemaName = normalizedSlug.replace("-", "_");
@@ -88,7 +94,7 @@ public class TenantService {
     @Transactional
     public void deleteTenant(UUID id) {
         Tenant tenant = tenantRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Tenant not found."));
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Tenant not found."));
 
         Tenant oldTenant = copyTenant(tenant);
 
@@ -105,7 +111,7 @@ public class TenantService {
     @Transactional
     public TenantResponse updateTenant(UUID id, TenantUpdateRequest req) {
         Tenant tenant = tenantRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Tenant not found."));
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Tenant not found."));
 
         Tenant oldTenant = copyTenant(tenant);
 
