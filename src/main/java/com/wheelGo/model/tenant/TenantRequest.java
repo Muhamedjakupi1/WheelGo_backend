@@ -1,6 +1,8 @@
 package com.wheelGo.model.tenant;
 
 import com.wheelGo.model.enums.Plan;
+import com.wheelGo.model.tenant_settings.TenantSettingsRequest;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -22,4 +24,7 @@ public class TenantRequest {
 
     private String adminEmail;
     private String adminPassword;
+
+    @Valid
+    private TenantSettingsRequest settings;
 }
