@@ -46,7 +46,7 @@ public class TenantController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Tenant>> getAll() {
+    public ResponseEntity<List<TenantResponse>> getAll() {
         return ResponseEntity.ok(tenantService.getAll());
     }
 
