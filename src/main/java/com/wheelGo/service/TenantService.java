@@ -7,6 +7,7 @@ import com.wheelGo.model.tenant.Tenant;
 import com.wheelGo.model.tenant.TenantRequest;
 import com.wheelGo.model.tenant.TenantResponse;
 import com.wheelGo.model.tenant.TenantUpdateRequest;
+import com.wheelGo.model.tenant_settings.TenantSettingsResponse;
 import com.wheelGo.model.user.User;
 import com.wheelGo.repository.TenantRepository;
 import com.wheelGo.repository.UserRepository;
@@ -40,6 +41,7 @@ public class TenantService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditLogService auditLogService;
+    private final TenantSettingsService tenantSettingsService;
 
     @Transactional
     public TenantResponse createTenant(TenantRequest req) {
@@ -67,6 +69,7 @@ public class TenantService {
 
         Tenant savedTenant = tenantRepository.save(tenant);
         schemaService.createSchemaForTenant(schemaName);
+        TenantSettingsResponse settings = tenantSettingsService.createForTenant(schemaName, req.getSettings());
 
         User adminUser = new User();
         adminUser.setEmail(req.getAdminEmail().trim().toLowerCase());
@@ -84,11 +87,13 @@ public class TenantService {
         log.info("Tenant '{}' was created with schema '{}' and admin '{}'.",
                 savedTenant.getSlug(), schemaName, adminUser.getEmail());
 
-        return tenantMapper.toResponse(savedTenant);
+        return toResponse(savedTenant, settings);
     }
 
-    public List<Tenant> getAll() {
-        return tenantRepository.findAll();
+    public List<TenantResponse> getAll() {
+        return tenantRepository.findAll().stream()
+                .map(tenant -> toResponse(tenant, tenantSettingsService.getForTenant(tenant.getSchemaName())))
+                .toList();
     }
 
     @Transactional
@@ -129,9 +134,18 @@ public class TenantService {
 
         tenant.setUpdatedAt(LocalDateTime.now());
         Tenant updated = tenantRepository.save(tenant);
+        TenantSettingsResponse settings = req.getSettings() != null
+                ? tenantSettingsService.updateForTenant(updated.getSchemaName(), req.getSettings())
+                : tenantSettingsService.getForTenant(updated.getSchemaName());
         TenantContext.runWithSchema(updated.getSchemaName(),
                 () -> auditLogService.log(AuditAction.UPDATE, "Tenant", updated.getId(), oldTenant, updated));
-        return tenantMapper.toResponse(updated);
+        return toResponse(updated, settings);
+    }
+
+    private TenantResponse toResponse(Tenant tenant, TenantSettingsResponse settings) {
+        TenantResponse response = tenantMapper.toResponse(tenant);
+        response.setSettings(settings);
+        return response;
     }
 
     private Tenant copyTenant(Tenant tenant) {

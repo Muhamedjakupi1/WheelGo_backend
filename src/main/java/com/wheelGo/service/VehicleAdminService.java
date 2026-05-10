@@ -66,7 +66,11 @@ public class VehicleAdminService {
         applyCreateOrUpdate(
                 vehicle,
                 request.getCategoryId() != null ? request.getCategoryId() : vehicle.getCategory().getId(),
-                request.getLocationId() != null ? request.getLocationId() : vehicle.getLocation() != null ? vehicle.getLocation().getId() : null,
+                Boolean.TRUE.equals(request.getClearLocation())
+                        ? null
+                        : request.getLocationId() != null
+                        ? request.getLocationId()
+                        : vehicle.getLocation() != null ? vehicle.getLocation().getId() : null,
                 plateNumber,
                 request.getMake() != null ? request.getMake() : vehicle.getMake(),
                 request.getModel() != null ? request.getModel() : vehicle.getModel(),

@@ -18,6 +18,7 @@ public class VehicleUpdateRequest {
 
     private UUID categoryId;
     private UUID locationId;
+    private Boolean clearLocation;
     private String plateNumber;
     private String make;
     private String model;
