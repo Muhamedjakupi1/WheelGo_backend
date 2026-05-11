@@ -34,6 +34,9 @@ public class Addon {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
+    @Column(nullable = true)
+    private int quantity;
+
     @Column(columnDefinition = "addon_type")
     @Enumerated(EnumType.STRING)
     @JdbcType(PostgreSQLEnumJdbcType.class)
