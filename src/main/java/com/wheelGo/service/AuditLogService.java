@@ -7,20 +7,20 @@ import com.wheelGo.model.audit_logs.AuditLogRequest;
 import com.wheelGo.model.audit_logs.AuditLogResponse;
 import com.wheelGo.model.enums.AuditAction;
 import com.wheelGo.repository.AuditLogRepository;
+import com.wheelGo.repository.UserRepository;
 import com.wheelGo.tools.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-import org.springframework.web.server.ResponseStatusException;
-
-import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 import java.util.List;
 import java.util.Map;
@@ -30,6 +30,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuditLogService {
     private final AuditLogRepository auditLogRepository;
+    private final UserRepository userRepository;
+    private final AdminAccessService adminAccessService;
     private final AuditLogMapper auditLogMapper;
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());;
     @PersistenceContext
@@ -45,24 +47,8 @@ public class AuditLogService {
     }
 
     @Transactional(readOnly = true)
-    public AuditLogResponse getAuditLogById(UUID id) {
-        AuditLog auditLog = auditLogRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Audit log not found"));
-
-        return auditLogMapper.toResponse(auditLog);
-    }
-
-    @Transactional(readOnly = true)
     public List<AuditLogResponse> getAllAuditLogs() {
         return auditLogRepository.findAll()
-                .stream()
-                .map(auditLogMapper::toResponse)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<AuditLogResponse> getAuditLogsByEntity(String entityType, UUID entityId) {
-        return auditLogRepository.findByEntityTypeAndEntityIdOrderByCreatedAtDesc(entityType, entityId)
                 .stream()
                 .map(auditLogMapper::toResponse)
                 .toList();
@@ -77,6 +63,16 @@ public class AuditLogService {
     }
 
     @Transactional(readOnly = true)
+    public List<AuditLogResponse> getAuditLogsByUserEmail(String email) {
+        UUID tenantId = adminAccessService.requireCurrentTenantId();
+        UUID userId = userRepository.findByEmailAndTenantId(normalizeEmail(email), tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"))
+                .getId();
+
+        return getAuditLogsByUserId(userId);
+    }
+
+    @Transactional(readOnly = true)
     public List<AuditLogResponse> getAuditLogsByAction(AuditAction action) {
         return auditLogRepository.findByActionOrderByCreatedAtDesc(action)
                 .stream()
@@ -86,17 +82,6 @@ public class AuditLogService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void log(AuditAction action, String entityType, UUID entityId, Object oldData, Object newData) {
-        saveAuditLog(SecurityUtils.getCurrentUserId(), action, entityType, entityId, oldData, newData);
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void log(UUID userId, AuditAction action, String entityType, UUID entityId, Object oldData, Object newData) {
-        saveAuditLog(userId, action, entityType, entityId, oldData, newData);
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void logForSchema(String schemaName, AuditAction action, String entityType, UUID entityId, Object oldData, Object newData) {
-        setLocalSearchPath(schemaName);
         saveAuditLog(SecurityUtils.getCurrentUserId(), action, entityType, entityId, oldData, newData);
     }
 
@@ -163,6 +148,13 @@ public class AuditLogService {
     private String resolveUserAgent() {
         HttpServletRequest currentRequest = getCurrentRequest();
         return currentRequest != null ? currentRequest.getHeader("User-Agent") : null;
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null || email.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is required");
+        }
+        return email.trim().toLowerCase();
     }
 
     private HttpServletRequest getCurrentRequest() {
