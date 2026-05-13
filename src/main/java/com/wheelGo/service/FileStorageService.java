@@ -28,6 +28,27 @@ public class FileStorageService {
     }
 
     public String storeVehicleImage(MultipartFile file) {
+        return storeImage(file, "vehicle-images", null);
+    }
+
+    public String storeDriverLicenseImage(MultipartFile file, String side) {
+        return storeImage(file, "driver-license-images", side);
+    }
+
+    public Path resolveStoredUpload(String relativeUrl) {
+        if (relativeUrl == null || relativeUrl.isBlank() || !relativeUrl.startsWith("/uploads/")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stored upload path is invalid");
+        }
+
+        String normalized = relativeUrl.substring("/uploads/".length()).replace("/", java.io.File.separator);
+        Path resolved = uploadRoot.resolve(normalized).normalize();
+        if (!resolved.startsWith(uploadRoot) || !Files.exists(resolved)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Stored upload file not found");
+        }
+        return resolved;
+    }
+
+    private String storeImage(MultipartFile file, String folder, String filePrefix) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image file is required");
         }
@@ -39,17 +60,17 @@ public class FileStorageService {
         }
 
         try {
-            Path targetDir = uploadRoot.resolve("vehicle-images");
+            Path targetDir = uploadRoot.resolve(folder);
             Files.createDirectories(targetDir);
 
-            String fileName = UUID.randomUUID() + "." + extension;
+            String fileName = (filePrefix == null || filePrefix.isBlank() ? "" : filePrefix + "-") + UUID.randomUUID() + "." + extension;
             Path targetFile = targetDir.resolve(fileName).normalize();
 
             try (InputStream inputStream = file.getInputStream()) {
                 Files.copy(inputStream, targetFile, StandardCopyOption.REPLACE_EXISTING);
             }
 
-            return "/uploads/vehicle-images/" + fileName;
+            return "/uploads/" + folder + "/" + fileName;
         } catch (IOException ex) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to store image file");
         }
