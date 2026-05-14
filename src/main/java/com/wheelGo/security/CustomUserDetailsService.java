@@ -24,6 +24,7 @@ public class CustomUserDetailsService implements UserDetailsService {
                 user.getId(),
                 user.getEmail(),
                 user.getPasswordHash(),
+                JwtUtils.credentialVersion(user.getPasswordHash()),
                 user.getRole().name(),
                 tenantId,
                 tenantSlug,

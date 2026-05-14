@@ -46,14 +46,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = authHeader.substring(7);
 
-        if (!jwtUtils.validateToken(token)) {
+        Claims claims;
+        try {
+            claims = jwtUtils.extractAllClaims(token);
+        } catch (RuntimeException ex) {
             writeUnauthorized(response, "Invalid or expired token");
             return;
         }
 
-        Claims claims = jwtUtils.extractAllClaims(token);
-
         String email = claims.getSubject();
+        String credentialVersion = claims.get("credentialVersion", String.class);
         String role = claims.get("role", String.class);
         String tenantSlug = claims.get("tenantSlug", String.class);
         UUID userId = parseUuidClaim(claims, "userId");
@@ -63,7 +65,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String originalRole = claims.get("originalRole", String.class);
         UUID originalUserId = parseUuidClaim(claims, "originalUserId");
 
-        if (email == null || role == null || userId == null || tenantId == null || tenantSlug == null) {
+        if (email == null || credentialVersion == null || role == null || userId == null || tenantId == null || tenantSlug == null) {
             writeUnauthorized(response, "Token is missing required claims");
             return;
         }
@@ -84,7 +86,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
+        String currentCredentialVersion = JwtUtils.credentialVersion(user.getPasswordHash());
+
         if (!email.equalsIgnoreCase(user.getEmail())
+                || !credentialVersion.equals(currentCredentialVersion)
                 || !role.equals(user.getRole().name())
                 || !tenantSlug.equals(tenant.getSlug())) {
             writeUnauthorized(response, "Token no longer matches the current account state");
@@ -94,7 +99,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         CustomUserPrincipal principal = new CustomUserPrincipal(
                 user.getId(),
                 user.getEmail(),
-                null,
+                user.getPasswordHash(),
+                currentCredentialVersion,
                 user.getRole().name(),
                 tenant.getId(),
                 tenant.getSlug(),

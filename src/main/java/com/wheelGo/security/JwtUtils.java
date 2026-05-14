@@ -9,7 +9,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Date;
+import java.util.HexFormat;
 import java.util.UUID;
 
 @Component
@@ -25,6 +28,7 @@ public class JwtUtils {
         return Jwts.builder()
                 .setSubject(p.getEmail())
                 .claim("userId", p.getUserId() != null ? p.getUserId().toString() : null)
+                .claim("credentialVersion", p.getCredentialVersion())
                 .claim("role", p.getRole())
                 .claim("tenantId", p.getTenantId() != null ? p.getTenantId().toString() : null)
                 .claim("tenantSlug", p.getTenantSlug())
@@ -43,6 +47,7 @@ public class JwtUtils {
         return Jwts.builder()
                 .setSubject(target.getEmail())
                 .claim("userId", target.getUserId() != null ? target.getUserId().toString() : null)
+                .claim("credentialVersion", target.getCredentialVersion())
                 .claim("role", target.getRole())
                 .claim("tenantId", target.getTenantId() != null ? target.getTenantId().toString() : null)
                 .claim("tenantSlug", target.getTenantSlug())
@@ -73,6 +78,20 @@ public class JwtUtils {
             return true;
         } catch (JwtException | IllegalArgumentException e) {
             return false;
+        }
+    }
+
+    public static String credentialVersion(String passwordHash) {
+        if (passwordHash == null || passwordHash.isBlank()) {
+            return null;
+        }
+
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashed = digest.digest(passwordHash.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hashed);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is not available", e);
         }
     }
 }

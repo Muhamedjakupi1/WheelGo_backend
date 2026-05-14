@@ -18,6 +18,7 @@ public class CustomUserPrincipal implements UserDetails {
     private final UUID userId;
     private final String email;
     private final String password;
+    private final String credentialVersion;
     private final String role;
     private final UUID tenantId;
     private final String tenantSlug;
