@@ -44,7 +44,8 @@ public class ImpersonationController {
         CustomUserPrincipal targetPrincipal = new CustomUserPrincipal(
                 target.getId(),
                 target.getEmail(),
-                null,
+                target.getPasswordHash(),
+                JwtUtils.credentialVersion(target.getPasswordHash()),
                 target.getRole().name(),
                 tenant.getId(),
                 tenant.getSlug(),
@@ -88,7 +89,8 @@ public class ImpersonationController {
         CustomUserPrincipal original = new CustomUserPrincipal(
                 superAdmin.getId(),
                 superAdmin.getEmail(),
-                null,
+                superAdmin.getPasswordHash(),
+                JwtUtils.credentialVersion(superAdmin.getPasswordHash()),
                 superAdmin.getRole().name(),
                 tenantId,
                 slug,

@@ -127,7 +127,8 @@ public class SwaggerDevAuthenticationFilter extends OncePerRequestFilter {
         return new CustomUserPrincipal(
                 user.getId(),
                 user.getEmail(),
-                null,
+                user.getPasswordHash(),
+                JwtUtils.credentialVersion(user.getPasswordHash()),
                 com.wheelGo.model.enums.Role.SUPER_ADMIN.name(),
                 tenant != null ? tenant.getId() : null,
                 tenant != null ? tenant.getSlug() : null,
