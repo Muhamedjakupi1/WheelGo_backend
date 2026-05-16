@@ -1,12 +1,14 @@
 package com.wheelGo.service;
 
 import com.wheelGo.model.locations.Location;
+import com.wheelGo.model.enums.BookingStatus;
 import com.wheelGo.model.vehicle_categories.VehicleCategory;
 import com.wheelGo.model.vehicle_images.VehicleImage;
 import com.wheelGo.model.vehicles.Vehicle;
 import com.wheelGo.model.vehicles.VehicleRequest;
 import com.wheelGo.model.vehicles.VehicleResponse;
 import com.wheelGo.model.vehicles.VehicleUpdateRequest;
+import com.wheelGo.repository.BookingRepository;
 import com.wheelGo.repository.LocationRepository;
 import com.wheelGo.repository.VehicleCategoryRepository;
 import com.wheelGo.repository.VehicleImageRepository;
@@ -18,6 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.format.DateTimeFormatter;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -29,11 +33,15 @@ import java.util.stream.Collectors;
 public class VehicleAdminService {
     private static final String VEHICLE_IN_USE_MESSAGE =
             "This vehicle cannot be deleted because it is already used in one or more bookings.";
+    private static final EnumSet<BookingStatus> BLOCKING_BOOKING_STATUSES =
+            EnumSet.of(BookingStatus.CONFIRMED, BookingStatus.ACTIVE);
+    private static final DateTimeFormatter RENTED_UNTIL_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final VehicleRepository vehicleRepository;
     private final VehicleCategoryRepository vehicleCategoryRepository;
     private final LocationRepository locationRepository;
     private final VehicleImageRepository vehicleImageRepository;
+    private final BookingRepository bookingRepository;
 
     @Transactional(readOnly = true)
     public List<VehicleResponse> getAll() {
@@ -207,6 +215,14 @@ public class VehicleAdminService {
         response.setSeats(vehicle.getSeats());
         response.setDailyRate(vehicle.getDailyRate());
         response.setStatus(vehicle.getStatus());
+        bookingRepository.findAllByVehicleIdAndStatusInOrderByEndDateAsc(vehicle.getId(), BLOCKING_BOOKING_STATUSES)
+                .stream()
+                .map(booking -> booking.getEndDate().toLocalDate())
+                .max(java.time.LocalDate::compareTo)
+                .ifPresent(rentedUntil -> {
+                    response.setRentedUntil(rentedUntil);
+                    response.setStatusMessage("Rented until " + rentedUntil.format(RENTED_UNTIL_FORMATTER));
+                });
         response.setMileage(vehicle.getMileage());
         response.setImageUrls(images.stream().map(VehicleImage::getUrl).toList());
         response.setPrimaryImageUrl(images.stream()
