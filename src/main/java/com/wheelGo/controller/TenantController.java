@@ -4,7 +4,9 @@ import com.wheelGo.model.tenant.TenantRequest;
 import com.wheelGo.model.tenant.Tenant;
 import com.wheelGo.model.tenant.TenantResponse;
 import com.wheelGo.model.tenant.TenantUpdateRequest;
+import com.wheelGo.model.tenant_settings.SupportedCurrencyResponse;
 import com.wheelGo.security.ApiErrorResponse;
+import com.wheelGo.service.SupportedCurrencyService;
 import com.wheelGo.service.TenantService;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
@@ -25,6 +27,7 @@ import java.util.UUID;
 public class TenantController {
 
     private final TenantService tenantService;
+    private final SupportedCurrencyService supportedCurrencyService;
 
     @PostMapping
     public ResponseEntity<?> create(@RequestBody @Valid TenantRequest request) {
@@ -48,6 +51,11 @@ public class TenantController {
     @GetMapping
     public ResponseEntity<List<TenantResponse>> getAll() {
         return ResponseEntity.ok(tenantService.getAll());
+    }
+
+    @GetMapping("/currencies")
+    public ResponseEntity<List<SupportedCurrencyResponse>> getSupportedCurrencies() {
+        return ResponseEntity.ok(supportedCurrencyService.getSupportedCurrencies());
     }
 
     @DeleteMapping("/{id}")

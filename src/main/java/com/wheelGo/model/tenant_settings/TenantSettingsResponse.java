@@ -9,6 +9,8 @@ public class TenantSettingsResponse {
 
     private UUID   id;
     private String currency;
+    private String currencySymbol;
+    private String currencyName;
     private String timezone;
     private String logoUrl;
     private String themeColor;
