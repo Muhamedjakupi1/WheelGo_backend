@@ -6,6 +6,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -26,6 +27,13 @@ public class BookingResponse {
     private BigDecimal totalPrice;
     private BookingStatus status;
     private String notes;
+    private String specialRequest;
+    private Boolean babySeatRequested;
+    private List<String> addonNames;
+    private String vehicleName;
+    private String vehicleImageUrl;
+    private String locationName;
+    private String customerEmail;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
