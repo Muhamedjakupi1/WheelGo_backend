@@ -21,7 +21,7 @@ public class AddonController {
 
     @GetMapping
     public ResponseEntity<List<AddonResponse>> getActiveAddons() {
-        return ResponseEntity.ok(addonRepository.findAllByIsActiveTrueOrderByNameAsc().stream()
+        return ResponseEntity.ok(addonRepository.findAllByIsActiveTrueAndIsDeletedFalseOrderByNameAsc().stream()
                 .map(this::toResponse)
                 .toList());
     }
@@ -35,6 +35,7 @@ public class AddonController {
         response.setQuantity(addon.getQuantity());
         response.setType(addon.getType());
         response.setIsActive(addon.getIsActive());
+        response.setInventoryManaged(addon.getInventoryManaged());
         response.setCreatedAt(addon.getCreatedAt());
         response.setUpdatedAt(addon.getUpdatedAt());
         return response;

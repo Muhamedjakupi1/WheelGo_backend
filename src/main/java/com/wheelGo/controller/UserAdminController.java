@@ -35,4 +35,10 @@ public class UserAdminController {
                                                @RequestBody @Valid UserUpdateRequest request) {
         return ResponseEntity.ok(userAdminService.update(id, request));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+        userAdminService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
 }

@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import jakarta.persistence.EntityManager;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -23,6 +25,7 @@ public class UserAdminService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AdminAccessService adminAccessService;
+    private final EntityManager entityManager;
 
     @Transactional(readOnly = true)
     public List<UserResponse> getAll() {
@@ -70,6 +73,71 @@ public class UserAdminService {
         }
 
         return toResponse(userRepository.save(user));
+    }
+
+    @Transactional
+    public void delete(UUID id) {
+        UUID tenantId = adminAccessService.requireCurrentTenantId();
+        CustomUserPrincipal principal = adminAccessService.requireCurrentPrincipal();
+        User user = findUser(id, tenantId);
+
+        if (principal.getUserId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot delete your own account");
+        }
+
+        entityManager.createNativeQuery("DELETE FROM ticket_messages WHERE sender_id = :userId")
+                .setParameter("userId", id)
+                .executeUpdate();
+        entityManager.createNativeQuery("""
+                UPDATE addons addon
+                SET quantity = addon.quantity + reserved.total_quantity,
+                    updated_at = NOW()
+                FROM (
+                    SELECT ba.addon_id, SUM(ba.quantity) AS total_quantity
+                    FROM booking_addons ba
+                    JOIN bookings b ON b.id = ba.booking_id
+                    JOIN addons managed_addon ON managed_addon.id = ba.addon_id
+                    WHERE b.user_id = :userId
+                      AND b.status IN ('PENDING', 'CONFIRMED', 'ACTIVE')
+                      AND LOWER(managed_addon.name) IN ('baby seat', 'bluetooth')
+                    GROUP BY ba.addon_id
+                ) reserved
+                WHERE addon.id = reserved.addon_id
+                """)
+                .setParameter("userId", id)
+                .executeUpdate();
+        entityManager.createNativeQuery("""
+                DELETE FROM ticket_messages
+                WHERE ticket_id IN (
+                    SELECT id FROM support_tickets WHERE user_id = :userId
+                    UNION
+                    SELECT id FROM support_tickets WHERE booking_id IN (
+                        SELECT id FROM bookings WHERE user_id = :userId
+                    )
+                )
+                """)
+                .setParameter("userId", id)
+                .executeUpdate();
+        entityManager.createNativeQuery("""
+                DELETE FROM support_tickets
+                WHERE user_id = :userId
+                   OR booking_id IN (SELECT id FROM bookings WHERE user_id = :userId)
+                """)
+                .setParameter("userId", id)
+                .executeUpdate();
+        entityManager.createNativeQuery("DELETE FROM reviews WHERE user_id = :userId")
+                .setParameter("userId", id)
+                .executeUpdate();
+        entityManager.createNativeQuery("DELETE FROM chat_sessions WHERE user_id = :userId")
+                .setParameter("userId", id)
+                .executeUpdate();
+        entityManager.createNativeQuery("DELETE FROM audit_logs WHERE user_id = :userId")
+                .setParameter("userId", id)
+                .executeUpdate();
+        entityManager.createNativeQuery("DELETE FROM bookings WHERE user_id = :userId")
+                .setParameter("userId", id)
+                .executeUpdate();
+        userRepository.delete(user);
     }
 
     private void validateRoleChange(CustomUserPrincipal principal, User targetUser, Role newRole) {

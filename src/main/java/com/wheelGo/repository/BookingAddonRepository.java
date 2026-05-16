@@ -8,4 +8,5 @@ import java.util.UUID;
 
 public interface BookingAddonRepository extends JpaRepository<BookingAddon, UUID> {
     List<BookingAddon> findByBookingIdIn(List<UUID> bookingIds);
+    boolean existsByAddonId(UUID addonId);
 }

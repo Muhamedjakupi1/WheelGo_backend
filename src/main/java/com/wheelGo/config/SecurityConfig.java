@@ -4,6 +4,7 @@ import com.wheelGo.security.JwtAuthenticationFilter;
 import com.wheelGo.security.RestAccessDeniedHandler;
 import com.wheelGo.security.RestAuthenticationEntryPoint;
 import com.wheelGo.security.SwaggerDevAuthenticationFilter;
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -50,9 +51,11 @@ public class SecurityConfig {
                         .accessDeniedHandler(restAccessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ERROR, DispatcherType.FORWARD).permitAll()
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/public/**",
+                                "/error",
                                 "/uploads/**",
                                 // Added the missing /api-docs paths:
                                 "/api-docs",

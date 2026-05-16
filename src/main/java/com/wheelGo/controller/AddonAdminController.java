@@ -6,6 +6,7 @@ import com.wheelGo.service.AddonAdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,6 +30,11 @@ public class AddonAdminController {
         return ResponseEntity.ok(addonAdminService.getAll());
     }
 
+    @PostMapping
+    public ResponseEntity<AddonResponse> create(@RequestBody AddonRequest request) {
+        return ResponseEntity.ok(addonAdminService.create(request));
+    }
+
     @PostMapping("/ensure-defaults")
     public ResponseEntity<List<AddonResponse>> ensureDefaults() {
         return ResponseEntity.ok(addonAdminService.ensureInventoryAddons());
@@ -37,5 +43,11 @@ public class AddonAdminController {
     @PatchMapping("/{id}")
     public ResponseEntity<AddonResponse> update(@PathVariable UUID id, @RequestBody AddonRequest request) {
         return ResponseEntity.ok(addonAdminService.update(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+        addonAdminService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 }

@@ -12,6 +12,7 @@ import com.wheelGo.repository.VehicleCategoryRepository;
 import com.wheelGo.repository.VehicleImageRepository;
 import com.wheelGo.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class VehicleAdminService {
+    private static final String VEHICLE_IN_USE_MESSAGE =
+            "This vehicle cannot be deleted because it is already used in one or more bookings.";
 
     private final VehicleRepository vehicleRepository;
     private final VehicleCategoryRepository vehicleCategoryRepository;
@@ -90,7 +93,13 @@ public class VehicleAdminService {
 
     @Transactional
     public void delete(UUID id) {
-        vehicleRepository.delete(findVehicle(id));
+        Vehicle vehicle = findVehicle(id);
+        try {
+            vehicleRepository.delete(vehicle);
+            vehicleRepository.flush();
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, VEHICLE_IN_USE_MESSAGE, ex);
+        }
     }
 
     private void applyCreateOrUpdate(Vehicle vehicle,
