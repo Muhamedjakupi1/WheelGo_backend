@@ -1,3 +1,10 @@
 package com.wheelGo.auth;
 
-public record AuthSignUpRequest(String email, String password, String tenantSlug) {}
+public record AuthSignUpRequest(
+        String email,
+        String password,
+        String tenantSlug,
+        String firstName,
+        String lastName,
+        String phone
+) {}

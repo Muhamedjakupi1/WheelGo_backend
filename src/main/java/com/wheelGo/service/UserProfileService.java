@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
@@ -23,6 +24,7 @@ public class UserProfileService {
     private final UserProfileRepository userProfileRepository;
     private final UserRepository userRepository;
     private final UserProfileMapper userProfileMapper;
+    private final FileStorageService fileStorageService;
 
     @Transactional
     public UserProfileResponse createProfile(UUID userId, UserProfileRequest request) {
@@ -85,6 +87,19 @@ public class UserProfileService {
             profile.setCountry(normalizeOptionalText(request.getCountry()));
         }
 
+        profile.setUpdatedAt(LocalDateTime.now());
+
+        UserProfile updatedProfile = userProfileRepository.save(profile);
+        return userProfileMapper.toResponse(updatedProfile);
+    }
+
+    @Transactional
+    public UserProfileResponse uploadAvatar(UUID userId, MultipartFile file) {
+        UserProfile profile = userProfileRepository.findByUser_Id(userId)
+                .orElseGet(() -> createDefaultProfile(userId));
+
+        String avatarUrl = fileStorageService.storeProfileAvatar(file);
+        profile.setAvatarUrl(avatarUrl);
         profile.setUpdatedAt(LocalDateTime.now());
 
         UserProfile updatedProfile = userProfileRepository.save(profile);

@@ -43,7 +43,10 @@ public class AuthController {
             AuthSignUpRequest request = new AuthSignUpRequest(
                     req.email(),
                     req.password(),
-                    tenantSlug
+                    tenantSlug,
+                    req.firstName(),
+                    req.lastName(),
+                    req.phone()
             );
             return ResponseEntity.ok(authService.signup(request));
         } catch (ResponseStatusException e) {
