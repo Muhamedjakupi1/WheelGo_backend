@@ -45,6 +45,12 @@ public class Addon {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
+    @Column(name = "inventory_managed", nullable = false)
+    private Boolean inventoryManaged = false;
+
+    @Column(name = "is_deleted", nullable = false)
+    private Boolean isDeleted = false;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt=LocalDateTime.now();
 

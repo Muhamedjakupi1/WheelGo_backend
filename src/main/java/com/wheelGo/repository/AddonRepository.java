@@ -8,7 +8,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface AddonRepository extends JpaRepository<Addon, UUID> {
-    List<Addon> findAllByIsActiveTrueOrderByNameAsc();
+    List<Addon> findAllByIsActiveTrueAndIsDeletedFalseOrderByNameAsc();
+    List<Addon> findAllByIsDeletedFalseOrderByNameAsc();
     Optional<Addon> findFirstByNameIgnoreCaseAndIsActiveTrue(String name);
+    Optional<Addon> findFirstByNameIgnoreCaseAndIsDeletedFalse(String name);
     Optional<Addon> findFirstByNameIgnoreCase(String name);
 }

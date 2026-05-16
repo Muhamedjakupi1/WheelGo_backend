@@ -5,6 +5,7 @@ import com.wheelGo.model.addon.AddonRequest;
 import com.wheelGo.model.addon.AddonResponse;
 import com.wheelGo.model.enums.AddonType;
 import com.wheelGo.repository.AddonRepository;
+import com.wheelGo.repository.BookingAddonRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -14,7 +15,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,11 +28,11 @@ public class AddonAdminService {
     private static final BigDecimal DEFAULT_BLUETOOTH_PRICE = new BigDecimal("10.00");
 
     private final AddonRepository addonRepository;
+    private final BookingAddonRepository bookingAddonRepository;
 
     @Transactional(readOnly = true)
     public List<AddonResponse> getAll() {
-        return addonRepository.findAll().stream()
-                .sorted(Comparator.comparing(Addon::getName, String.CASE_INSENSITIVE_ORDER))
+        return addonRepository.findAllByIsDeletedFalseOrderByNameAsc().stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -45,12 +45,40 @@ public class AddonAdminService {
     }
 
     @Transactional
+    public AddonResponse create(AddonRequest request) {
+        String name = requiredText(request.getName(), "Addon name is required");
+        addonRepository.findFirstByNameIgnoreCaseAndIsDeletedFalse(name)
+                .ifPresent(existing -> {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "An addon with this name already exists");
+                });
+
+        Addon addon = new Addon();
+        addon.setName(name);
+        addon.setDescription(trimToNull(request.getDescription()));
+        addon.setPrice(normalizePrice(request.getPrice() != null ? request.getPrice() : BigDecimal.ZERO));
+        addon.setQuantity(normalizeQuantity(request.getQuantity()));
+        addon.setType(request.getType() != null ? request.getType() : AddonType.ONE_TIME);
+        addon.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);
+        addon.setInventoryManaged(true);
+        addon.setIsDeleted(false);
+        addon.setCreatedAt(LocalDateTime.now());
+        addon.setUpdatedAt(LocalDateTime.now());
+        return toResponse(addonRepository.save(addon));
+    }
+
+    @Transactional
     public AddonResponse update(UUID id, AddonRequest request) {
         Addon addon = addonRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Addon not found"));
 
         if (request.getName() != null) {
-            addon.setName(requiredText(request.getName(), "Addon name is required"));
+            String name = requiredText(request.getName(), "Addon name is required");
+            addonRepository.findFirstByNameIgnoreCaseAndIsDeletedFalse(name)
+                    .filter(existing -> !existing.getId().equals(id))
+                    .ifPresent(existing -> {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "An addon with this name already exists");
+                    });
+            addon.setName(name);
         }
         if (request.getDescription() != null) {
             addon.setDescription(trimToNull(request.getDescription()));
@@ -74,8 +102,33 @@ public class AddonAdminService {
         return toResponse(addonRepository.save(addon));
     }
 
+    @Transactional
+    public void delete(UUID id) {
+        Addon addon = addonRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Addon not found"));
+        if (!bookingAddonRepository.existsByAddonId(id)) {
+            addonRepository.delete(addon);
+            return;
+        }
+
+        addon.setIsActive(false);
+        addon.setIsDeleted(true);
+        addon.setUpdatedAt(LocalDateTime.now());
+        addonRepository.save(addon);
+    }
+
     private Addon ensureAddon(String name, String description, BigDecimal price) {
         return addonRepository.findFirstByNameIgnoreCase(name)
+                .map(existing -> {
+                    existing.setDescription(description);
+                    existing.setPrice(price);
+                    existing.setType(AddonType.ONE_TIME);
+                    existing.setIsActive(true);
+                    existing.setInventoryManaged(true);
+                    existing.setIsDeleted(false);
+                    existing.setUpdatedAt(LocalDateTime.now());
+                    return addonRepository.save(existing);
+                })
                 .orElseGet(() -> {
                     Addon addon = new Addon();
                     addon.setName(name);
@@ -84,6 +137,8 @@ public class AddonAdminService {
                     addon.setQuantity(0);
                     addon.setType(AddonType.ONE_TIME);
                     addon.setIsActive(true);
+                    addon.setInventoryManaged(true);
+                    addon.setIsDeleted(false);
                     addon.setCreatedAt(LocalDateTime.now());
                     addon.setUpdatedAt(LocalDateTime.now());
                     return addonRepository.save(addon);
@@ -99,6 +154,7 @@ public class AddonAdminService {
         response.setQuantity(addon.getQuantity());
         response.setType(addon.getType());
         response.setIsActive(addon.getIsActive());
+        response.setInventoryManaged(addon.getInventoryManaged());
         response.setCreatedAt(addon.getCreatedAt());
         response.setUpdatedAt(addon.getUpdatedAt());
         return response;
@@ -109,6 +165,14 @@ public class AddonAdminService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Addon price cannot be negative");
         }
         return price.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private int normalizeQuantity(Integer quantity) {
+        int normalized = quantity != null ? quantity : 0;
+        if (normalized < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Addon quantity cannot be negative");
+        }
+        return normalized;
     }
 
     private String requiredText(String value, String message) {

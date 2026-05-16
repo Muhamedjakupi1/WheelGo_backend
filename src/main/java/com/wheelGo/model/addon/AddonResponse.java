@@ -18,6 +18,7 @@ public class AddonResponse {
     private Integer quantity;
     private AddonType type;
     private Boolean isActive;
+    private Boolean inventoryManaged;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

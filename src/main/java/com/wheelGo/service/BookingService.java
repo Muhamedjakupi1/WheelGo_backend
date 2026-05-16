@@ -3,9 +3,11 @@ package com.wheelGo.service;
 import com.wheelGo.model.addon.Addon;
 import com.wheelGo.model.booking_addons.BookingAddon;
 import com.wheelGo.model.bookings.BookingAdminDecisionRequest;
+import com.wheelGo.model.bookings.BookingAdminUpdateRequest;
 import com.wheelGo.model.bookings.Booking;
 import com.wheelGo.model.bookings.BookingCreateRequest;
 import com.wheelGo.model.bookings.BookingResponse;
+import com.wheelGo.model.bookings.BookingSelectedAddonRequest;
 import com.wheelGo.model.enums.AddonType;
 import com.wheelGo.model.enums.BookingStatus;
 import com.wheelGo.model.enums.VehicleStatus;
@@ -34,11 +36,15 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -48,11 +54,10 @@ import java.util.stream.Collectors;
 public class BookingService {
     private static final String BABY_SEAT_NAME = AddonAdminService.BABY_SEAT_NAME;
     private static final String BLUETOOTH_NAME = AddonAdminService.BLUETOOTH_NAME;
-    private static final String CUSTOM_ADDON_NAME = "Approved custom request";
     private static final BigDecimal FALLBACK_BABY_SEAT_PRICE = new BigDecimal("25.00");
     private static final BigDecimal FALLBACK_BLUETOOTH_PRICE = new BigDecimal("10.00");
     private static final EnumSet<BookingStatus> BLOCKING_STATUSES =
-            EnumSet.of(BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE);
+            EnumSet.of(BookingStatus.CONFIRMED, BookingStatus.ACTIVE);
     private static final EnumSet<BookingStatus> RELEASABLE_STATUSES =
             EnumSet.of(BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.ACTIVE);
 
@@ -97,42 +102,23 @@ public class BookingService {
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
 
-        boolean overlappingBookingExists =
-                bookingRepository.existsByVehicleIdAndStatusInAndStartDateLessThanAndEndDateGreaterThan(
-                        vehicle.getId(),
-                        BLOCKING_STATUSES,
-                        endDateTime,
-                        startDateTime
-                );
-
-        if (overlappingBookingExists) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Vehicle is already booked for the selected dates");
-        }
+        ensureVehicleDatesAvailable(vehicle.getId(), startDateTime, endDateTime, null);
 
         int totalDays = calculateTotalDays(startDate, endDate);
         BigDecimal basePrice = vehicle.getDailyRate()
                 .multiply(BigDecimal.valueOf(totalDays))
                 .setScale(2, RoundingMode.HALF_UP);
 
-        int babySeatQuantity = resolveBabySeatQuantity(request);
-        int bluetoothQuantity = normalizeQuantity(request.getBluetoothQuantity());
-        boolean babySeatRequested = babySeatQuantity > 0;
+        List<SelectedAddon> selectedAddons = resolveRequestedAddons(request);
+        boolean babySeatRequested = selectedAddons.stream()
+                .map(SelectedAddon::addon)
+                .filter(Objects::nonNull)
+                .anyMatch(addon -> BABY_SEAT_NAME.equalsIgnoreCase(addon.getName()));
         BigDecimal addonPrice = BigDecimal.ZERO;
-        Addon babySeatAddon = findOrCreateManagedAddon(
-                BABY_SEAT_NAME,
-                "Child safety seat add-on for bookings",
-                FALLBACK_BABY_SEAT_PRICE
-        );
-        Addon bluetoothAddon = findOrCreateManagedAddon(
-                BLUETOOTH_NAME,
-                "Portable Bluetooth add-on for bookings",
-                FALLBACK_BLUETOOTH_PRICE
-        );
-
-        validateAndReserve(babySeatAddon, babySeatQuantity);
-        validateAndReserve(bluetoothAddon, bluetoothQuantity);
-        addonPrice = addonPrice.add(calculateAddonTotal(babySeatAddon, babySeatQuantity));
-        addonPrice = addonPrice.add(calculateAddonTotal(bluetoothAddon, bluetoothQuantity));
+        for (SelectedAddon selectedAddon : selectedAddons) {
+            validateAndReserve(selectedAddon.addon(), selectedAddon.quantity());
+            addonPrice = addonPrice.add(calculateAddonTotal(selectedAddon.addon(), selectedAddon.quantity(), totalDays));
+        }
 
         BigDecimal discountAmount = BigDecimal.ZERO;
         BigDecimal totalPrice = basePrice.add(addonPrice).subtract(discountAmount).setScale(2, RoundingMode.HALF_UP);
@@ -156,17 +142,9 @@ public class BookingService {
 
         Booking savedBooking = bookingRepository.save(booking);
 
-        List<BookingAddon> savedAddons = List.of();
-        if (babySeatQuantity > 0 && bluetoothQuantity > 0) {
-            savedAddons = List.of(
-                    saveBookingAddon(savedBooking.getId(), babySeatAddon, babySeatQuantity),
-                    saveBookingAddon(savedBooking.getId(), bluetoothAddon, bluetoothQuantity)
-            );
-        } else if (babySeatQuantity > 0) {
-            savedAddons = List.of(saveBookingAddon(savedBooking.getId(), babySeatAddon, babySeatQuantity));
-        } else if (bluetoothQuantity > 0) {
-            savedAddons = List.of(saveBookingAddon(savedBooking.getId(), bluetoothAddon, bluetoothQuantity));
-        }
+        List<BookingAddon> savedAddons = selectedAddons.stream()
+                .map(selectedAddon -> saveBookingAddon(savedBooking.getId(), selectedAddon.addon(), selectedAddon.quantity(), totalDays))
+                .toList();
 
         BookingResponse response = toResponse(savedBooking, vehicle, savedAddons, babySeatRequested);
         response.setVehicleImageUrl(
@@ -200,9 +178,6 @@ public class BookingService {
 
         BigDecimal approvedCharge = normalizeMoney(request != null ? request.getAddonCharge() : null);
         if (approvedCharge.compareTo(BigDecimal.ZERO) > 0) {
-            Addon customAddon = createCustomAddon(request, booking.getNotes(), approvedCharge);
-            saveBookingAddon(booking.getId(), customAddon, 1);
-
             BigDecimal addonPrice = normalizeMoney(booking.getAddonPrice()).add(approvedCharge);
             booking.setAddonPrice(addonPrice);
             booking.setTotalPrice(
@@ -211,11 +186,14 @@ public class BookingService {
                             .subtract(normalizeMoney(booking.getDiscountAmount()))
                             .setScale(2, RoundingMode.HALF_UP)
             );
+            appendApprovedChargeNote(booking, request != null ? request.getAddonName() : null, approvedCharge);
         }
 
         booking.setStatus(BookingStatus.CONFIRMED);
         booking.setUpdatedAt(LocalDateTime.now());
-        return toResponseWithDetails(bookingRepository.save(booking));
+        Booking savedBooking = bookingRepository.save(booking);
+        syncVehicleStatus(savedBooking.getVehicleId());
+        return toResponseWithDetails(savedBooking);
     }
 
     @Transactional
@@ -233,7 +211,93 @@ public class BookingService {
         releaseBookingAddonInventory(booking);
         booking.setStatus(BookingStatus.CANCELLED);
         booking.setUpdatedAt(LocalDateTime.now());
-        return toResponseWithDetails(bookingRepository.save(booking));
+        Booking savedBooking = bookingRepository.save(booking);
+        syncVehicleStatus(savedBooking.getVehicleId());
+        return toResponseWithDetails(savedBooking);
+    }
+
+    @Transactional
+    public BookingResponse updateBookingAsAdmin(UUID bookingId, BookingAdminUpdateRequest request) {
+        releaseFinishedAddonInventory();
+        Booking booking = findBooking(bookingId);
+        Vehicle vehicle = vehicleRepository.findById(booking.getVehicleId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vehicle not found"));
+
+        LocalDateTime startDateTime = booking.getStartDate();
+        LocalDateTime endDateTime = booking.getEndDate();
+
+        if (request.getStartDate() != null || request.getEndDate() != null) {
+            LocalDate startDate = request.getStartDate() != null ? request.getStartDate() : booking.getStartDate().toLocalDate();
+            LocalDate endDate = request.getEndDate() != null ? request.getEndDate() : booking.getEndDate().toLocalDate();
+            validateBookingDates(startDate, endDate);
+            startDateTime = startDate.atStartOfDay();
+            endDateTime = endDate.atTime(LocalTime.MAX);
+        }
+
+        BookingStatus targetStatus = request.getStatus() != null ? request.getStatus() : booking.getStatus();
+
+        if (BLOCKING_STATUSES.contains(targetStatus)) {
+            ensureVehicleDatesAvailable(vehicle.getId(), startDateTime, endDateTime, booking.getId());
+        }
+
+        boolean wasInventoryReserved = RELEASABLE_STATUSES.contains(booking.getStatus());
+        boolean shouldReleaseInventory = wasInventoryReserved && isTerminalStatus(targetStatus);
+
+        if (request.getStartDate() != null || request.getEndDate() != null) {
+            booking.setStartDate(startDateTime);
+            booking.setEndDate(endDateTime);
+            booking.setTotalDays(calculateTotalDays(startDateTime.toLocalDate(), endDateTime.toLocalDate()));
+
+            BigDecimal recalculatedBasePrice = normalizeMoney(vehicle.getDailyRate())
+                    .multiply(BigDecimal.valueOf(booking.getTotalDays()))
+                    .setScale(2, RoundingMode.HALF_UP);
+            booking.setBasePrice(recalculatedBasePrice);
+            booking.setTotalPrice(
+                    recalculatedBasePrice
+                            .add(normalizeMoney(booking.getAddonPrice()))
+                            .subtract(normalizeMoney(booking.getDiscountAmount()))
+                            .setScale(2, RoundingMode.HALF_UP)
+            );
+        }
+
+        if (request.getAddonCharge() != null && request.getAddonCharge().compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal addonPrice = normalizeMoney(booking.getAddonPrice()).add(normalizeMoney(request.getAddonCharge()));
+            booking.setAddonPrice(addonPrice);
+            booking.setTotalPrice(
+                    normalizeMoney(booking.getBasePrice())
+                            .add(addonPrice)
+                            .subtract(normalizeMoney(booking.getDiscountAmount()))
+                            .setScale(2, RoundingMode.HALF_UP)
+            );
+            appendApprovedChargeNote(booking, request.getAddonName(), normalizeMoney(request.getAddonCharge()));
+        }
+
+        String note = normalizeOptionalText(request.getNote());
+        if (note != null) {
+            booking.setNotes(appendNote(booking.getNotes(), "Admin note: " + note));
+        }
+
+        if (shouldReleaseInventory) {
+            releaseBookingAddonInventory(booking);
+        }
+
+        booking.setStatus(targetStatus);
+        booking.setUpdatedAt(LocalDateTime.now());
+        Booking savedBooking = bookingRepository.save(booking);
+        syncVehicleStatus(savedBooking.getVehicleId());
+        return toResponseWithDetails(savedBooking);
+    }
+
+    @Transactional
+    public void deleteBookingAsAdmin(UUID bookingId) {
+        releaseFinishedAddonInventory();
+        Booking booking = findBooking(bookingId);
+        if (RELEASABLE_STATUSES.contains(booking.getStatus())) {
+            releaseBookingAddonInventory(booking);
+        }
+        UUID vehicleId = booking.getVehicleId();
+        bookingRepository.delete(booking);
+        syncVehicleStatus(vehicleId);
     }
 
     private List<BookingResponse> toResponses(List<Booking> bookings) {
@@ -296,12 +360,12 @@ public class BookingService {
                 .toList();
     }
 
-    private BookingAddon saveBookingAddon(UUID bookingId, Addon addon, int quantity) {
+    private BookingAddon saveBookingAddon(UUID bookingId, Addon addon, int quantity, int totalDays) {
         BookingAddon bookingAddon = new BookingAddon();
         bookingAddon.setBookingId(bookingId);
         bookingAddon.setAddonId(addon.getId());
         bookingAddon.setQuantity((short) quantity);
-        bookingAddon.setPriceSnapshot(resolvePrice(addon, FALLBACK_BABY_SEAT_PRICE));
+        bookingAddon.setPriceSnapshot(resolveSnapshotPrice(addon, totalDays));
         bookingAddon.setCreatedAt(LocalDateTime.now());
         return bookingAddonRepository.save(bookingAddon);
     }
@@ -359,36 +423,11 @@ public class BookingService {
                     addon.setQuantity(0);
                     addon.setType(AddonType.ONE_TIME);
                     addon.setIsActive(true);
+                    addon.setInventoryManaged(true);
                     addon.setCreatedAt(LocalDateTime.now());
                     addon.setUpdatedAt(LocalDateTime.now());
                     return addonRepository.save(addon);
                 });
-    }
-
-    private Addon createCustomAddon(BookingAdminDecisionRequest request, String bookingNotes, BigDecimal price) {
-        Addon addon = new Addon();
-        addon.setName(resolveCustomAddonName(request));
-        addon.setDescription(resolveCustomAddonDescription(request, bookingNotes));
-        addon.setPrice(price);
-        addon.setQuantity(0);
-        addon.setType(AddonType.ONE_TIME);
-        addon.setIsActive(false);
-        addon.setCreatedAt(LocalDateTime.now());
-        addon.setUpdatedAt(LocalDateTime.now());
-        return addonRepository.save(addon);
-    }
-
-    private String resolveCustomAddonName(BookingAdminDecisionRequest request) {
-        String name = normalizeOptionalText(request != null ? request.getAddonName() : null);
-        return name != null ? name : CUSTOM_ADDON_NAME;
-    }
-
-    private String resolveCustomAddonDescription(BookingAdminDecisionRequest request, String bookingNotes) {
-        String note = normalizeOptionalText(request != null ? request.getNote() : null);
-        if (note != null) {
-            return note;
-        }
-        return normalizeOptionalText(bookingNotes);
     }
 
     private BigDecimal resolvePrice(Addon addon, BigDecimal fallback) {
@@ -400,26 +439,32 @@ public class BookingService {
         return (value != null ? value : BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
     }
 
-    private BigDecimal calculateAddonTotal(Addon addon, int quantity) {
+    private BigDecimal calculateAddonTotal(Addon addon, int quantity, int totalDays) {
         if (quantity <= 0) {
             return BigDecimal.ZERO;
         }
-        return resolvePrice(addon, BigDecimal.ZERO).multiply(BigDecimal.valueOf(quantity)).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal total = resolvePrice(addon, BigDecimal.ZERO).multiply(BigDecimal.valueOf(quantity));
+        if (addon != null && addon.getType() == AddonType.DAILY) {
+            total = total.multiply(BigDecimal.valueOf(totalDays));
+        }
+        return total.setScale(2, RoundingMode.HALF_UP);
     }
 
     private void validateAndReserve(Addon addon, int quantity) {
         if (quantity <= 0) {
             return;
         }
-        if (addon.getQuantity() < quantity) {
+        if (Boolean.TRUE.equals(addon.getInventoryManaged()) && addon.getQuantity() < quantity) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     addon.getName() + " has only " + addon.getQuantity() + " available"
             );
         }
-        addon.setQuantity(addon.getQuantity() - quantity);
-        addon.setUpdatedAt(LocalDateTime.now());
-        addonRepository.save(addon);
+        if (Boolean.TRUE.equals(addon.getInventoryManaged())) {
+            addon.setQuantity(addon.getQuantity() - quantity);
+            addon.setUpdatedAt(LocalDateTime.now());
+            addonRepository.save(addon);
+        }
     }
 
     @Scheduled(
@@ -449,6 +494,10 @@ public class BookingService {
         }
         if (!finishedBookings.isEmpty()) {
             bookingRepository.saveAll(finishedBookings);
+            finishedBookings.stream()
+                    .map(Booking::getVehicleId)
+                    .distinct()
+                    .forEach(this::syncVehicleStatus);
         }
     }
 
@@ -464,7 +513,7 @@ public class BookingService {
 
         for (BookingAddon bookingAddon : bookingAddons) {
             Addon addon = addonsById.get(bookingAddon.getAddonId());
-            if (addon == null || !isManagedInventoryAddon(addon)) {
+            if (addon == null || !Boolean.TRUE.equals(addon.getInventoryManaged())) {
                 continue;
             }
             addon.setQuantity(addon.getQuantity() + bookingAddon.getQuantity());
@@ -473,8 +522,8 @@ public class BookingService {
         }
     }
 
-    private boolean isManagedInventoryAddon(Addon addon) {
-        return BABY_SEAT_NAME.equalsIgnoreCase(addon.getName()) || BLUETOOTH_NAME.equalsIgnoreCase(addon.getName());
+    private boolean isTerminalStatus(BookingStatus status) {
+        return status == BookingStatus.COMPLETED || status == BookingStatus.CANCELLED;
     }
 
     private int resolveBabySeatQuantity(BookingCreateRequest request) {
@@ -502,9 +551,89 @@ public class BookingService {
         return normalizedExisting == null ? addition : normalizedExisting + "\n\n" + addition;
     }
 
+    private void appendApprovedChargeNote(Booking booking, String addonName, BigDecimal charge) {
+        String normalizedName = normalizeOptionalText(addonName);
+        String note = normalizedName != null
+                ? "Approved special request charge (" + normalizedName + "): +" + charge
+                : "Approved special request charge: +" + charge;
+        booking.setNotes(appendNote(booking.getNotes(), note));
+    }
+
     private int calculateTotalDays(LocalDate startDate, LocalDate endDate) {
         long diff = ChronoUnit.DAYS.between(startDate, endDate);
         return (int) Math.max(diff, 1);
+    }
+
+    private void validateBookingDates(LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Booking dates are required");
+        }
+
+        if (endDate.isBefore(startDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "End date cannot be before start date");
+        }
+    }
+
+    private void ensureVehicleDatesAvailable(UUID vehicleId,
+                                             LocalDateTime startDateTime,
+                                             LocalDateTime endDateTime,
+                                             UUID excludedBookingId) {
+        List<Booking> conflicts = bookingRepository
+                .findAllByVehicleIdAndStatusInAndStartDateLessThanAndEndDateGreaterThanOrderByEndDateAsc(
+                        vehicleId,
+                        BLOCKING_STATUSES,
+                        endDateTime,
+                        startDateTime
+                ).stream()
+                .filter(booking -> excludedBookingId == null || !booking.getId().equals(excludedBookingId))
+                .toList();
+
+        if (conflicts.isEmpty()) {
+            return;
+        }
+
+        LocalDate latestBlockedDate = conflicts.stream()
+                .map(Booking::getEndDate)
+                .max(LocalDateTime::compareTo)
+                .orElse(endDateTime)
+                .toLocalDate();
+
+        String formattedDate = latestBlockedDate.format(DateTimeFormatter.ofPattern("d MMM yyyy"));
+        throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Vehicle is already reserved for the selected dates. It will be free after " + formattedDate + "."
+        );
+    }
+
+    private void syncVehicleStatus(UUID vehicleId) {
+        if (vehicleId == null) {
+            return;
+        }
+
+        Vehicle vehicle = vehicleRepository.findById(vehicleId).orElse(null);
+        if (vehicle == null) {
+            return;
+        }
+
+        Optional<Booking> latestBlockingBooking = bookingRepository
+                .findAllByVehicleIdAndStatusInOrderByEndDateAsc(vehicleId, BLOCKING_STATUSES)
+                .stream()
+                .max((left, right) -> left.getEndDate().compareTo(right.getEndDate()));
+
+        if (latestBlockingBooking.isPresent()) {
+            if (vehicle.getStatus() != VehicleStatus.RENTED) {
+                vehicle.setStatus(VehicleStatus.RENTED);
+                vehicle.setUpdatedAt(LocalDateTime.now());
+                vehicleRepository.save(vehicle);
+            }
+            return;
+        }
+
+        if (vehicle.getStatus() == VehicleStatus.RENTED) {
+            vehicle.setStatus(VehicleStatus.AVAILABLE);
+            vehicle.setUpdatedAt(LocalDateTime.now());
+            vehicleRepository.save(vehicle);
+        }
     }
 
     private String readLocationName(Location location) {
@@ -526,5 +655,64 @@ public class BookingService {
                 .map(VehicleImage::getUrl)
                 .findFirst()
                 .orElseGet(() -> images.stream().map(VehicleImage::getUrl).findFirst().orElse(null));
+    }
+
+    private BigDecimal resolveSnapshotPrice(Addon addon, int totalDays) {
+        BigDecimal basePrice = resolvePrice(addon, BigDecimal.ZERO);
+        if (addon != null && addon.getType() == AddonType.DAILY) {
+            return basePrice.multiply(BigDecimal.valueOf(totalDays)).setScale(2, RoundingMode.HALF_UP);
+        }
+        return basePrice;
+    }
+
+    private List<SelectedAddon> resolveRequestedAddons(BookingCreateRequest request) {
+        Map<UUID, Integer> requestedQuantities = new LinkedHashMap<>();
+
+        for (BookingSelectedAddonRequest addonRequest : request.getAddons()) {
+            if (addonRequest.getAddonId() == null || addonRequest.getQuantity() == null || addonRequest.getQuantity() <= 0) {
+                continue;
+            }
+            requestedQuantities.merge(addonRequest.getAddonId(), addonRequest.getQuantity(), Integer::sum);
+        }
+
+        int babySeatQuantity = resolveBabySeatQuantity(request);
+        if (babySeatQuantity > 0) {
+            Addon babySeatAddon = findOrCreateManagedAddon(
+                    BABY_SEAT_NAME,
+                    "Child safety seat add-on for bookings",
+                    FALLBACK_BABY_SEAT_PRICE
+            );
+            requestedQuantities.merge(babySeatAddon.getId(), babySeatQuantity, Integer::sum);
+        }
+
+        int bluetoothQuantity = normalizeQuantity(request.getBluetoothQuantity());
+        if (bluetoothQuantity > 0) {
+            Addon bluetoothAddon = findOrCreateManagedAddon(
+                    BLUETOOTH_NAME,
+                    "Portable Bluetooth add-on for bookings",
+                    FALLBACK_BLUETOOTH_PRICE
+            );
+            requestedQuantities.merge(bluetoothAddon.getId(), bluetoothQuantity, Integer::sum);
+        }
+
+        if (requestedQuantities.isEmpty()) {
+            return List.of();
+        }
+
+        Map<UUID, Addon> addonsById = addonRepository.findAllById(requestedQuantities.keySet()).stream()
+                .collect(Collectors.toMap(Addon::getId, Function.identity()));
+
+        return requestedQuantities.entrySet().stream()
+                .map(entry -> {
+                    Addon addon = addonsById.get(entry.getKey());
+                    if (addon == null || !Boolean.TRUE.equals(addon.getIsActive()) || Boolean.TRUE.equals(addon.getIsDeleted())) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "One or more selected add-ons are no longer available");
+                    }
+                    return new SelectedAddon(addon, entry.getValue());
+                })
+                .toList();
+    }
+
+    private record SelectedAddon(Addon addon, int quantity) {
     }
 }

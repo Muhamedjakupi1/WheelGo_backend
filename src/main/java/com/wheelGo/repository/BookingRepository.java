@@ -13,11 +13,29 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     List<Booking> findAllByUserIdOrderByCreatedAtDesc(UUID userId);
     List<Booking> findAllByOrderByCreatedAtDesc();
     List<Booking> findAllByStatusInAndEndDateBefore(Collection<BookingStatus> statuses, LocalDateTime dateTime);
+    List<Booking> findAllByVehicleIdAndStatusInOrderByEndDateAsc(
+            UUID vehicleId,
+            Collection<BookingStatus> statuses
+    );
+    List<Booking> findAllByVehicleIdAndStatusInAndStartDateLessThanAndEndDateGreaterThanOrderByEndDateAsc(
+            UUID vehicleId,
+            Collection<BookingStatus> statuses,
+            LocalDateTime requestedEnd,
+            LocalDateTime requestedStart
+    );
 
     boolean existsByVehicleIdAndStatusInAndStartDateLessThanAndEndDateGreaterThan(
             UUID vehicleId,
             Collection<BookingStatus> statuses,
             LocalDateTime requestedEnd,
             LocalDateTime requestedStart
+    );
+
+    boolean existsByVehicleIdAndStatusInAndStartDateLessThanAndEndDateGreaterThanAndIdNot(
+            UUID vehicleId,
+            Collection<BookingStatus> statuses,
+            LocalDateTime requestedEnd,
+            LocalDateTime requestedStart,
+            UUID id
     );
 }

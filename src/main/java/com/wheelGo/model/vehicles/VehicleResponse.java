@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,6 +29,8 @@ public class VehicleResponse {
     private Short seats;
     private BigDecimal dailyRate;
     private VehicleStatus status;
+    private LocalDate rentedUntil;
+    private String statusMessage;
     private Integer mileage;
     private String primaryImageUrl;
     private List<String> imageUrls;

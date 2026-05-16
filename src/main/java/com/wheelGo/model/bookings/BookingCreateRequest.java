@@ -2,10 +2,13 @@ package com.wheelGo.model.bookings;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.Valid;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -27,6 +30,9 @@ public class BookingCreateRequest {
 
     @PositiveOrZero(message = "Bluetooth quantity cannot be negative")
     private Integer bluetoothQuantity = 0;
+
+    @Valid
+    private List<BookingSelectedAddonRequest> addons = new ArrayList<>();
 
     private String specialRequest;
 }

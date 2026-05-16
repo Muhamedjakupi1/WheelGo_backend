@@ -1,8 +1,6 @@
 package com.wheelGo.controller;
 
 import com.wheelGo.model.tenant_settings.TenantSettingsResponse;
-import com.wheelGo.model.tenant_settings.SupportedCurrencyResponse;
-import com.wheelGo.service.SupportedCurrencyService;
 import com.wheelGo.service.TenantAdminSettingsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -11,24 +9,16 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 @RestController
-@RequestMapping("/api/v1/admin/tenant-settings")
+@RequestMapping("/api/v1/tenant-settings")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-public class TenantAdminSettingsController {
+@PreAuthorize("hasAnyRole('USER', 'ADMIN', 'SUPER_ADMIN')")
+public class TenantSettingsController {
 
     private final TenantAdminSettingsService tenantAdminSettingsService;
-    private final SupportedCurrencyService supportedCurrencyService;
 
     @GetMapping
     public ResponseEntity<TenantSettingsResponse> getCurrentTenantSettings() {
         return ResponseEntity.ok(tenantAdminSettingsService.getCurrentTenantSettings());
-    }
-
-    @GetMapping("/currencies")
-    public ResponseEntity<List<SupportedCurrencyResponse>> getSupportedCurrencies() {
-        return ResponseEntity.ok(supportedCurrencyService.getSupportedCurrencies());
     }
 }

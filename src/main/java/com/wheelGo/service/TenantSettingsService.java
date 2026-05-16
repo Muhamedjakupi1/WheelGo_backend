@@ -1,6 +1,7 @@
 package com.wheelGo.service;
 
 import com.wheelGo.model.tenant_settings.TenantSettingsRequest;
+import com.wheelGo.model.tenant_settings.SupportedCurrencyResponse;
 import com.wheelGo.model.tenant_settings.TenantSettingsResponse;
 import com.wheelGo.model.tenant_settings.TenantSettingsUpdateRequest;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class TenantSettingsService {
     private static final String DEFAULT_THEME_COLOR = "#1A73E8";
 
     private final JdbcTemplate jdbcTemplate;
+    private final SupportedCurrencyService supportedCurrencyService;
 
     public TenantSettingsResponse getForTenant(String schemaName) {
         try {
@@ -37,7 +39,7 @@ public class TenantSettingsService {
     }
 
     public TenantSettingsResponse createForTenant(String schemaName, TenantSettingsRequest request) {
-        String currency = normalizeValue(request != null ? request.getCurrency() : null, DEFAULT_CURRENCY);
+        String currency = normalizeCurrency(request != null ? request.getCurrency() : null, DEFAULT_CURRENCY);
         String timezone = normalizeValue(request != null ? request.getTimezone() : null, DEFAULT_TIMEZONE);
         String logoUrl = normalizeOptional(request != null ? request.getLogoUrl() : null);
         String themeColor = normalizeValue(request != null ? request.getThemeColor() : null, DEFAULT_THEME_COLOR);
@@ -65,7 +67,7 @@ public class TenantSettingsService {
             return createForTenant(schemaName, createRequest);
         }
 
-        String currency = normalizeValue(request != null ? request.getCurrency() : current.getCurrency(), DEFAULT_CURRENCY);
+        String currency = normalizeCurrency(request != null ? request.getCurrency() : current.getCurrency(), DEFAULT_CURRENCY);
         String timezone = normalizeValue(request != null ? request.getTimezone() : current.getTimezone(), DEFAULT_TIMEZONE);
         String logoUrl = request != null && request.getLogoUrl() != null
                 ? normalizeOptional(request.getLogoUrl())
@@ -85,7 +87,11 @@ public class TenantSettingsService {
     private TenantSettingsResponse mapResponse(ResultSet rs) throws SQLException {
         TenantSettingsResponse response = new TenantSettingsResponse();
         response.setId(rs.getObject("id", UUID.class));
-        response.setCurrency(rs.getString("currency"));
+        String currency = rs.getString("currency");
+        SupportedCurrencyResponse supportedCurrency = supportedCurrencyService.getByCode(currency);
+        response.setCurrency(currency);
+        response.setCurrencySymbol(supportedCurrency != null ? supportedCurrency.getSymbol() : null);
+        response.setCurrencyName(supportedCurrency != null ? supportedCurrency.getName() : null);
         response.setTimezone(rs.getString("timezone"));
         response.setLogoUrl(rs.getString("logo_url"));
         response.setThemeColor(rs.getString("theme_color"));
@@ -102,6 +108,11 @@ public class TenantSettingsService {
 
     private String normalizeValue(String value, String fallback) {
         String normalized = normalizeOptional(value);
+        return normalized == null ? fallback : normalized;
+    }
+
+    private String normalizeCurrency(String value, String fallback) {
+        String normalized = supportedCurrencyService.normalizeAndValidate(value);
         return normalized == null ? fallback : normalized;
     }
 
