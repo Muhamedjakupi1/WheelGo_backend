@@ -35,6 +35,10 @@ public class FileStorageService {
         return storeImage(file, "driver-license-images", side);
     }
 
+    public String storeProfileAvatar(MultipartFile file) {
+        return storeImage(file, "profile-avatars", null);
+    }
+
     public Path resolveStoredUpload(String relativeUrl) {
         if (relativeUrl == null || relativeUrl.isBlank() || !relativeUrl.startsWith("/uploads/")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stored upload path is invalid");

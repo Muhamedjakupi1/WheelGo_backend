@@ -91,6 +91,11 @@ public class AuthService {
             throw new ResponseStatusException(FORBIDDEN, "Public signup is disabled for this tenant");
         }
 
+        String email = required(req.email(), "Email").toLowerCase();
+        String firstName = required(req.firstName(), "First name");
+        String lastName = required(req.lastName(), "Last name");
+        String phone = required(req.phone(), "Phone number");
+
         Tenant tenant = tenantRepository.findBySlug(req.tenantSlug())
                 .orElseThrow(() -> new RuntimeException("Tenant not found"));
 
@@ -98,12 +103,12 @@ public class AuthService {
             throw new RuntimeException("Tenant is inactive");
         }
 
-        if (userRepository.existsByEmailAndTenantId(req.email().trim().toLowerCase(), tenant.getId())) {
+        if (userRepository.existsByEmailAndTenantId(email, tenant.getId())) {
             throw new RuntimeException("User already exists in this tenant");
         }
 
         User user = new User();
-        user.setEmail(req.email().trim().toLowerCase());
+        user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(req.password()));
         user.setRole(Role.USER);
         user.setTenant(tenant);
@@ -115,8 +120,9 @@ public class AuthService {
         tenantSchemaExecutor.runForTenant(tenant, () -> {
             UserProfile profile = new UserProfile();
             profile.setUser(saved);
-            profile.setFirstName("User");
-            profile.setLastName("User");
+            profile.setFirstName(firstName);
+            profile.setLastName(lastName);
+            profile.setPhone(phone);
             userProfileRepository.save(profile);
         });
 
@@ -148,5 +154,12 @@ public class AuthService {
                 null,
                 null
         );
+    }
+
+    private String required(String value, String fieldName) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new RuntimeException(fieldName + " is required");
+        }
+        return value.trim();
     }
 }
