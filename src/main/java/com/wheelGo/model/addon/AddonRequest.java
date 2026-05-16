@@ -12,6 +12,7 @@ public class AddonRequest {
     private String name;
     private String description;
     private BigDecimal price;
+    private Integer quantity;
     private AddonType type;
     private Boolean isActive;
 }
