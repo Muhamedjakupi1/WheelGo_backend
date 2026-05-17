@@ -6,6 +6,7 @@ import com.wheelGo.model.user.UserResponse;
 import com.wheelGo.model.user.UserUpdateRequest;
 import com.wheelGo.repository.UserRepository;
 import com.wheelGo.security.CustomUserPrincipal;
+import com.wheelGo.validation.PasswordPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -57,6 +58,9 @@ public class UserAdminService {
         }
 
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            if (!PasswordPolicy.isValid(request.getPassword())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, PasswordPolicy.MESSAGE);
+            }
             user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         }
 
