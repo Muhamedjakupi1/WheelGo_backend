@@ -84,7 +84,7 @@ public class BookingService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vehicle location is not configured");
         }
 
-        if (vehicle.getStatus() != VehicleStatus.AVAILABLE) {
+        if (vehicle.getStatus() == VehicleStatus.MAINTENANCE || vehicle.getStatus() == VehicleStatus.INACTIVE) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vehicle is not available for booking");
         }
 
@@ -615,12 +615,18 @@ public class BookingService {
             return;
         }
 
-        Optional<Booking> latestBlockingBooking = bookingRepository
+        if (vehicle.getStatus() == VehicleStatus.MAINTENANCE || vehicle.getStatus() == VehicleStatus.INACTIVE) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        Optional<Booking> activeBlockingBooking = bookingRepository
                 .findAllByVehicleIdAndStatusInOrderByEndDateAsc(vehicleId, BLOCKING_STATUSES)
                 .stream()
+                .filter(booking -> !booking.getStartDate().isAfter(now) && !booking.getEndDate().isBefore(now))
                 .max((left, right) -> left.getEndDate().compareTo(right.getEndDate()));
 
-        if (latestBlockingBooking.isPresent()) {
+        if (activeBlockingBooking.isPresent()) {
             if (vehicle.getStatus() != VehicleStatus.RENTED) {
                 vehicle.setStatus(VehicleStatus.RENTED);
                 vehicle.setUpdatedAt(LocalDateTime.now());
