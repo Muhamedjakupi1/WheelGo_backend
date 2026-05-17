@@ -5,6 +5,7 @@ import com.wheelGo.model.user.User;
 import com.wheelGo.model.user_settings.UserSettingsPasswordUpdateRequest;
 import com.wheelGo.repository.UserRepository;
 import com.wheelGo.tools.SecurityUtils;
+import com.wheelGo.validation.PasswordPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,6 +30,10 @@ public class UserSettingsService {
 
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password is incorrect");
+        }
+
+        if (!PasswordPolicy.isValid(request.getNewPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, PasswordPolicy.MESSAGE);
         }
 
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));

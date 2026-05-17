@@ -14,6 +14,7 @@ import com.wheelGo.repository.UserRepository;
 import com.wheelGo.schema.TenantContext;
 import com.wheelGo.schema.TenantSchemaService;
 import com.wheelGo.security.ReservedTenantSlugs;
+import com.wheelGo.validation.PasswordPolicy;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -57,6 +58,14 @@ public class TenantService {
 
         if (tenantRepository.existsBySlug(normalizedSlug)) {
             throw new ResponseStatusException(BAD_REQUEST, "Tenant with slug '" + normalizedSlug + "' already exists.");
+        }
+
+        if (req.getAdminPassword() == null || req.getAdminPassword().isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "Admin password is required.");
+        }
+
+        if (!PasswordPolicy.isValid(req.getAdminPassword())) {
+            throw new ResponseStatusException(BAD_REQUEST, PasswordPolicy.MESSAGE);
         }
 
         String schemaName = normalizedSlug.replace("-", "_");

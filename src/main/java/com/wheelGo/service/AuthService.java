@@ -15,6 +15,7 @@ import com.wheelGo.schema.TenantSchemaExecutor;
 import com.wheelGo.security.CustomUserPrincipal;
 import com.wheelGo.security.JwtUtils;
 import com.wheelGo.security.ReservedTenantSlugs;
+import com.wheelGo.validation.PasswordPolicy;
 import lombok.AllArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -105,6 +106,10 @@ public class AuthService {
 
         if (userRepository.existsByEmailAndTenantId(email, tenant.getId())) {
             throw new RuntimeException("User already exists in this tenant");
+        }
+
+        if (!PasswordPolicy.isValid(req.password())) {
+            throw new RuntimeException(PasswordPolicy.MESSAGE);
         }
 
         User user = new User();
