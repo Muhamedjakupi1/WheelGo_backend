@@ -12,10 +12,13 @@ import java.util.UUID;
 public class MaintenanceRecordResponse {
     private UUID id;
     private UUID vehicleId;
+    private String vehicleName;
+    private String plateNumber;
     private MaintenanceType type;
     private String description;
     private BigDecimal cost;
     private LocalDateTime performedAt;
     private LocalDateTime nextDueAt;
     private String performedBy;
+    private LocalDateTime createdAt;
 }

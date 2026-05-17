@@ -3,14 +3,17 @@ package com.wheelGo.service;
 import com.wheelGo.model.bookings.Booking;
 import com.wheelGo.model.bookings.BookingAdminDecisionRequest;
 import com.wheelGo.model.bookings.BookingCreateRequest;
+import com.wheelGo.model.bookings.BookingResponse;
 import com.wheelGo.model.enums.BookingStatus;
 import com.wheelGo.model.enums.VehicleStatus;
+import com.wheelGo.model.maintenance_records.MaintenanceRecord;
 import com.wheelGo.model.locations.Location;
 import com.wheelGo.model.user.User;
 import com.wheelGo.model.vehicles.Vehicle;
 import com.wheelGo.repository.AddonRepository;
 import com.wheelGo.repository.BookingAddonRepository;
 import com.wheelGo.repository.BookingRepository;
+import com.wheelGo.repository.MaintenanceRecordRepository;
 import com.wheelGo.repository.TenantRepository;
 import com.wheelGo.repository.UserRepository;
 import com.wheelGo.repository.VehicleImageRepository;
@@ -48,6 +51,7 @@ class BookingServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private VehicleRepository vehicleRepository;
     @Mock private VehicleImageRepository vehicleImageRepository;
+    @Mock private MaintenanceRecordRepository maintenanceRecordRepository;
     @InjectMocks private BookingService bookingService;
 
     private UUID userId;
@@ -98,6 +102,7 @@ class BookingServiceTest {
         when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
+        when(maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicleId)).thenReturn(List.of());
         when(bookingRepository.findAllByVehicleIdAndStatusInAndStartDateLessThanAndEndDateGreaterThanOrderByEndDateAsc(any(), any(), any(), any())).thenReturn(List.of());
         when(bookingRepository.save(any(Booking.class))).thenReturn(saved);
         when(vehicleImageRepository.findByVehicleIdOrderByUploadedAtDesc(vehicleId)).thenReturn(List.of());
@@ -124,8 +129,8 @@ class BookingServiceTest {
     }
 
     @Test
-    void should_throw_bad_request_when_vehicle_unavailable_for_booking() {
-        vehicle.setStatus(VehicleStatus.MAINTENANCE);
+    void should_throw_bad_request_when_vehicle_inactive_for_booking() {
+        vehicle.setStatus(VehicleStatus.INACTIVE);
         BookingCreateRequest request = new BookingCreateRequest();
         request.setVehicleId(vehicleId);
 
@@ -136,6 +141,67 @@ class BookingServiceTest {
         assertThatThrownBy(() -> bookingService.createBooking(userId, request))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Vehicle is not available for booking");
+    }
+
+    @Test
+    void should_throw_conflict_when_vehicle_under_maintenance_until_requested_start_date() {
+        vehicle.setStatus(VehicleStatus.MAINTENANCE);
+        BookingCreateRequest request = new BookingCreateRequest();
+        request.setVehicleId(vehicleId);
+        request.setStartDate(LocalDate.of(2026, 5, 21));
+        request.setEndDate(LocalDate.of(2026, 5, 23));
+        MaintenanceRecord maintenanceRecord = new MaintenanceRecord();
+        maintenanceRecord.setNextDueAt(LocalDateTime.of(2026, 5, 22, 9, 0));
+
+        when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
+        when(maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicleId))
+                .thenReturn(List.of(maintenanceRecord));
+
+        assertThatThrownBy(() -> bookingService.createBooking(userId, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("under maintenance until 22 May 2026");
+    }
+
+    @Test
+    void should_create_booking_when_vehicle_maintenance_ends_on_requested_start_date() {
+        vehicle.setStatus(VehicleStatus.MAINTENANCE);
+        BookingCreateRequest request = new BookingCreateRequest();
+        request.setVehicleId(vehicleId);
+        request.setStartDate(LocalDate.of(2026, 5, 22));
+        request.setEndDate(LocalDate.of(2026, 5, 24));
+        MaintenanceRecord maintenanceRecord = new MaintenanceRecord();
+        maintenanceRecord.setNextDueAt(LocalDateTime.of(2026, 5, 22, 9, 0));
+
+        Booking saved = new Booking();
+        saved.setId(UUID.randomUUID());
+        saved.setUserId(userId);
+        saved.setVehicleId(vehicleId);
+        saved.setPickupLocationId(vehicle.getLocation().getId());
+        saved.setDropoffLocationId(vehicle.getLocation().getId());
+        saved.setStartDate(request.getStartDate().atStartOfDay());
+        saved.setEndDate(request.getEndDate().atTime(java.time.LocalTime.MAX));
+        saved.setTotalDays(2);
+        saved.setBasePrice(new BigDecimal("200.00"));
+        saved.setDiscountAmount(BigDecimal.ZERO);
+        saved.setAddonPrice(BigDecimal.ZERO);
+        saved.setTotalPrice(new BigDecimal("200.00"));
+        saved.setStatus(BookingStatus.PENDING);
+
+        when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
+        when(maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicleId))
+                .thenReturn(List.of(maintenanceRecord));
+        when(bookingRepository.findAllByVehicleIdAndStatusInAndStartDateLessThanAndEndDateGreaterThanOrderByEndDateAsc(any(), any(), any(), any()))
+                .thenReturn(List.of());
+        when(bookingRepository.save(any(Booking.class))).thenReturn(saved);
+        when(vehicleImageRepository.findByVehicleIdOrderByUploadedAtDesc(vehicleId)).thenReturn(List.of());
+
+        BookingResponse result = bookingService.createBooking(userId, request);
+
+        assertThat(result.getStatus()).isEqualTo(BookingStatus.PENDING);
     }
 
     @Test
@@ -151,6 +217,7 @@ class BookingServiceTest {
         when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
+        when(maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicleId)).thenReturn(List.of());
         when(bookingRepository.findAllByVehicleIdAndStatusInAndStartDateLessThanAndEndDateGreaterThanOrderByEndDateAsc(any(), any(), any(), any())).thenReturn(List.of(conflict));
 
         assertThatThrownBy(() -> bookingService.createBooking(userId, request))
@@ -171,6 +238,7 @@ class BookingServiceTest {
         when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
         when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
         when(bookingRepository.save(booking)).thenReturn(booking);
+        when(maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicleId)).thenReturn(List.of());
         when(bookingRepository.findAllByVehicleIdAndStatusInOrderByEndDateAsc(vehicleId, java.util.EnumSet.of(BookingStatus.CONFIRMED, BookingStatus.ACTIVE))).thenReturn(List.of());
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
         when(vehicleRepository.findAllById(any())).thenReturn(List.of(vehicle));
