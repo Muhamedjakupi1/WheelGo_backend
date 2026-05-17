@@ -1,0 +1,185 @@
+package com.wheelGo.service;
+
+import com.wheelGo.model.bookings.Booking;
+import com.wheelGo.model.bookings.BookingAdminDecisionRequest;
+import com.wheelGo.model.bookings.BookingCreateRequest;
+import com.wheelGo.model.enums.BookingStatus;
+import com.wheelGo.model.enums.VehicleStatus;
+import com.wheelGo.model.locations.Location;
+import com.wheelGo.model.user.User;
+import com.wheelGo.model.vehicles.Vehicle;
+import com.wheelGo.repository.AddonRepository;
+import com.wheelGo.repository.BookingAddonRepository;
+import com.wheelGo.repository.BookingRepository;
+import com.wheelGo.repository.TenantRepository;
+import com.wheelGo.repository.UserRepository;
+import com.wheelGo.repository.VehicleImageRepository;
+import com.wheelGo.repository.VehicleRepository;
+import com.wheelGo.schema.TenantSchemaExecutor;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class BookingServiceTest {
+
+    @Mock private BookingRepository bookingRepository;
+    @Mock private BookingAddonRepository bookingAddonRepository;
+    @Mock private AddonRepository addonRepository;
+    @Mock private TenantRepository tenantRepository;
+    @Mock private TenantSchemaExecutor tenantSchemaExecutor;
+    @Mock private UserRepository userRepository;
+    @Mock private VehicleRepository vehicleRepository;
+    @Mock private VehicleImageRepository vehicleImageRepository;
+    @InjectMocks private BookingService bookingService;
+
+    private UUID userId;
+    private UUID vehicleId;
+    private User user;
+    private Vehicle vehicle;
+
+    @BeforeEach
+    void setUp() {
+        userId = UUID.randomUUID();
+        vehicleId = UUID.randomUUID();
+        user = new User();
+        user.setId(userId);
+        Location location = new Location();
+        location.setId(UUID.randomUUID());
+        location.setName("Pristina");
+        vehicle = new Vehicle();
+        vehicle.setId(vehicleId);
+        vehicle.setLocation(location);
+        vehicle.setMake("BMW");
+        vehicle.setModel("X5");
+        vehicle.setDailyRate(new BigDecimal("100.00"));
+        vehicle.setStatus(VehicleStatus.AVAILABLE);
+    }
+
+    @Test
+    void should_create_booking_when_request_valid() {
+        BookingCreateRequest request = new BookingCreateRequest();
+        request.setVehicleId(vehicleId);
+        request.setStartDate(LocalDate.now().plusDays(1));
+        request.setEndDate(LocalDate.now().plusDays(3));
+
+        Booking saved = new Booking();
+        saved.setId(UUID.randomUUID());
+        saved.setUserId(userId);
+        saved.setVehicleId(vehicleId);
+        saved.setPickupLocationId(vehicle.getLocation().getId());
+        saved.setDropoffLocationId(vehicle.getLocation().getId());
+        saved.setStartDate(request.getStartDate().atStartOfDay());
+        saved.setEndDate(request.getEndDate().atTime(java.time.LocalTime.MAX));
+        saved.setTotalDays(2);
+        saved.setBasePrice(new BigDecimal("200.00"));
+        saved.setDiscountAmount(BigDecimal.ZERO);
+        saved.setAddonPrice(BigDecimal.ZERO);
+        saved.setTotalPrice(new BigDecimal("200.00"));
+        saved.setStatus(BookingStatus.PENDING);
+
+        when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
+        when(bookingRepository.findAllByVehicleIdAndStatusInAndStartDateLessThanAndEndDateGreaterThanOrderByEndDateAsc(any(), any(), any(), any())).thenReturn(List.of());
+        when(bookingRepository.save(any(Booking.class))).thenReturn(saved);
+        when(vehicleImageRepository.findByVehicleIdOrderByUploadedAtDesc(vehicleId)).thenReturn(List.of());
+
+        var result = bookingService.createBooking(userId, request);
+
+        assertThat(result.getStatus()).isEqualTo(BookingStatus.PENDING);
+        assertThat(result.getVehicleName()).isEqualTo("BMW X5");
+    }
+
+    @Test
+    void should_throw_bad_request_when_vehicle_has_no_location() {
+        vehicle.setLocation(null);
+        BookingCreateRequest request = new BookingCreateRequest();
+        request.setVehicleId(vehicleId);
+
+        when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
+
+        assertThatThrownBy(() -> bookingService.createBooking(userId, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Vehicle location is not configured");
+    }
+
+    @Test
+    void should_throw_bad_request_when_vehicle_unavailable_for_booking() {
+        vehicle.setStatus(VehicleStatus.MAINTENANCE);
+        BookingCreateRequest request = new BookingCreateRequest();
+        request.setVehicleId(vehicleId);
+
+        when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
+
+        assertThatThrownBy(() -> bookingService.createBooking(userId, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Vehicle is not available for booking");
+    }
+
+    @Test
+    void should_throw_conflict_when_booking_dates_overlap() {
+        BookingCreateRequest request = new BookingCreateRequest();
+        request.setVehicleId(vehicleId);
+        request.setStartDate(LocalDate.now().plusDays(1));
+        request.setEndDate(LocalDate.now().plusDays(3));
+        Booking conflict = new Booking();
+        conflict.setId(UUID.randomUUID());
+        conflict.setEndDate(LocalDateTime.now().plusDays(4));
+
+        when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
+        when(bookingRepository.findAllByVehicleIdAndStatusInAndStartDateLessThanAndEndDateGreaterThanOrderByEndDateAsc(any(), any(), any(), any())).thenReturn(List.of(conflict));
+
+        assertThatThrownBy(() -> bookingService.createBooking(userId, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("already reserved for the selected dates");
+    }
+
+    @Test
+    void should_confirm_booking_when_status_pending() {
+        Booking booking = new Booking();
+        booking.setId(UUID.randomUUID());
+        booking.setVehicleId(vehicleId);
+        booking.setStatus(BookingStatus.PENDING);
+        booking.setBasePrice(new BigDecimal("100.00"));
+        booking.setAddonPrice(BigDecimal.ZERO);
+        booking.setDiscountAmount(BigDecimal.ZERO);
+
+        when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
+        when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
+        when(bookingRepository.save(booking)).thenReturn(booking);
+        when(bookingRepository.findAllByVehicleIdAndStatusInOrderByEndDateAsc(vehicleId, java.util.EnumSet.of(BookingStatus.CONFIRMED, BookingStatus.ACTIVE))).thenReturn(List.of());
+        when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findAllById(any())).thenReturn(List.of(vehicle));
+        when(userRepository.findAllById(any())).thenReturn(List.of());
+        when(bookingAddonRepository.findByBookingIdIn(any())).thenReturn(List.of());
+        when(vehicleImageRepository.findByVehicleIdInOrderByUploadedAtDesc(any())).thenReturn(List.of());
+
+        var result = bookingService.confirmBooking(booking.getId(), new BookingAdminDecisionRequest());
+
+        assertThat(result.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+    }
+}
