@@ -1,14 +1,17 @@
 package com.wheelGo.controller;
 
+import com.wheelGo.auth.AuthResponse;
+import com.wheelGo.model.enums.Role;
 import com.wheelGo.model.user.User;
 import com.wheelGo.repository.TenantRepository;
 import com.wheelGo.repository.UserRepository;
-import com.wheelGo.auth.AuthResponse;
 import com.wheelGo.security.CustomUserPrincipal;
 import com.wheelGo.security.JwtUtils;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
 
@@ -29,17 +32,31 @@ public class ImpersonationController {
         this.jwtUtils = jwtUtils;
     }
 
+    @PostMapping("/start/{tenantSlug}")
+    @PreAuthorize("hasRole('SUPER_ADMIN') and !principal.impersonating")
+    public ResponseEntity<?> start(@PathVariable String tenantSlug,
+                                   @org.springframework.security.core.annotation.AuthenticationPrincipal CustomUserPrincipal superAdmin) {
+        return startForTenant(tenantSlug, superAdmin);
+    }
+
     @PostMapping("/start/{tenantSlug}/{targetUserId}")
     @PreAuthorize("hasRole('SUPER_ADMIN') and !principal.impersonating")
     public ResponseEntity<?> start(@PathVariable String tenantSlug,
                                    @PathVariable UUID targetUserId,
                                    @org.springframework.security.core.annotation.AuthenticationPrincipal CustomUserPrincipal superAdmin) {
+        return startForTenant(tenantSlug, superAdmin);
+    }
 
+    private ResponseEntity<AuthResponse> startForTenant(String tenantSlug, CustomUserPrincipal superAdmin) {
         var tenant = tenantRepository.findBySlug(tenantSlug)
-                .orElseThrow(() -> new RuntimeException("Tenant not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Tenant not found"));
 
-        User target = userRepository.findByIdAndTenantId(targetUserId, tenant.getId())
-                .orElseThrow(() -> new RuntimeException("User not found in this tenant"));
+        if (!tenant.isActive()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tenant account is inactive");
+        }
+
+        User target = userRepository.findFirstByTenantIdAndRoleAndIsActiveTrueOrderByCreatedAtAsc(tenant.getId(), Role.ADMIN)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No active tenant admin found"));
 
         CustomUserPrincipal targetPrincipal = new CustomUserPrincipal(
                 target.getId(),
@@ -60,11 +77,9 @@ public class ImpersonationController {
                 superAdmin.getRole()
         );
 
-        return ResponseEntity.ok(new AuthResponse(
+        return ResponseEntity.ok(authResponse(
                 token,
-                target.getEmail(),
-                target.getRole().name(),
-                target.getId(),
+                target,
                 tenant.getId(),
                 tenant.getSlug(),
                 true,
@@ -81,7 +96,7 @@ public class ImpersonationController {
         }
 
         User superAdmin = userRepository.findById(current.getOriginalUserId())
-                .orElseThrow(() -> new RuntimeException("Original admin not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Original admin not found"));
 
         String slug = superAdmin.getTenant() != null ? superAdmin.getTenant().getSlug() : null;
         var tenantId = superAdmin.getTenant() != null ? superAdmin.getTenant().getId() : null;
@@ -101,16 +116,34 @@ public class ImpersonationController {
 
         String token = jwtUtils.generateToken(original);
 
-        return ResponseEntity.ok(new AuthResponse(
+        return ResponseEntity.ok(authResponse(
                 token,
-                superAdmin.getEmail(),
-                superAdmin.getRole().name(),
-                superAdmin.getId(),
+                superAdmin,
                 tenantId,
                 slug,
                 false,
                 null,
                 null
         ));
+    }
+
+    private AuthResponse authResponse(String token,
+                                      User user,
+                                      UUID tenantId,
+                                      String tenantSlug,
+                                      boolean isImpersonating,
+                                      String originalRole,
+                                      UUID originalUserId) {
+        return new AuthResponse(
+                token,
+                user.getEmail(),
+                user.getRole().name(),
+                user.getId(),
+                tenantId,
+                tenantSlug,
+                isImpersonating,
+                originalRole,
+                originalUserId
+        );
     }
 }
