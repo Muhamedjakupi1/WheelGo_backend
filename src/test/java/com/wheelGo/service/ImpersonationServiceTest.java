@@ -1,5 +1,6 @@
-package com.wheelGo.controller;
+package com.wheelGo.service;
 
+import com.wheelGo.auth.AuthResponse;
 import com.wheelGo.model.enums.Role;
 import com.wheelGo.model.tenant.Tenant;
 import com.wheelGo.model.user.User;
@@ -12,8 +13,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
@@ -25,7 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class ImpersonationControllerTest {
+class ImpersonationServiceTest {
 
     @Mock
     private UserRepository userRepository;
@@ -37,7 +36,7 @@ class ImpersonationControllerTest {
     private JwtUtils jwtUtils;
 
     @InjectMocks
-    private ImpersonationController impersonationController;
+    private ImpersonationService impersonationService;
 
     @Test
     void should_start_impersonation_for_first_active_tenant_admin() {
@@ -75,13 +74,14 @@ class ImpersonationControllerTest {
                 .thenReturn(Optional.of(tenantAdmin));
         when(jwtUtils.generateImpersonationToken(any(), any(), any())).thenReturn("impersonation-token");
 
-        ResponseEntity<?> response = impersonationController.start("tenant-one", superAdmin);
+        AuthResponse response = impersonationService.startForTenant("tenant-one", superAdmin);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).hasFieldOrPropertyWithValue("token", "impersonation-token");
-        assertThat(response.getBody()).hasFieldOrPropertyWithValue("role", "ADMIN");
-        assertThat(response.getBody()).hasFieldOrPropertyWithValue("isImpersonating", true);
-        assertThat(response.getBody()).hasFieldOrPropertyWithValue("tenantSlug", "tenant-one");
+        assertThat(response.token()).isEqualTo("impersonation-token");
+        assertThat(response.role()).isEqualTo("ADMIN");
+        assertThat(response.isImpersonating()).isTrue();
+        assertThat(response.tenantSlug()).isEqualTo("tenant-one");
+        assertThat(response.originalRole()).isEqualTo("SUPER_ADMIN");
+        assertThat(response.originalUserId()).isEqualTo(superAdminId);
     }
 
     @Test
@@ -106,9 +106,49 @@ class ImpersonationControllerTest {
 
         when(tenantRepository.findBySlug("tenant-one")).thenReturn(Optional.of(tenant));
 
-        assertThatThrownBy(() -> impersonationController.start("tenant-one", superAdmin))
+        assertThatThrownBy(() -> impersonationService.startForTenant("tenant-one", superAdmin))
                 .isInstanceOf(ResponseStatusException.class)
-                .extracting("statusCode")
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+                .hasMessageContaining("Tenant account is inactive");
+    }
+
+    @Test
+    void should_stop_impersonation_and_restore_original_super_admin() {
+        UUID originalUserId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+
+        Tenant tenant = new Tenant();
+        tenant.setId(tenantId);
+        tenant.setSlug("super-admin-tenant");
+
+        User superAdmin = new User();
+        superAdmin.setId(originalUserId);
+        superAdmin.setEmail("super@wheelgo.com");
+        superAdmin.setPasswordHash("hash");
+        superAdmin.setRole(Role.SUPER_ADMIN);
+        superAdmin.setTenant(tenant);
+
+        CustomUserPrincipal impersonated = new CustomUserPrincipal(
+                UUID.randomUUID(),
+                "admin@tenant.com",
+                "hash",
+                "cred",
+                Role.ADMIN.name(),
+                UUID.randomUUID(),
+                "tenant-one",
+                true,
+                Role.SUPER_ADMIN.name(),
+                originalUserId
+        );
+
+        when(userRepository.findById(originalUserId)).thenReturn(Optional.of(superAdmin));
+        when(jwtUtils.generateToken(any())).thenReturn("restored-token");
+
+        AuthResponse response = impersonationService.stop(impersonated);
+
+        assertThat(response.token()).isEqualTo("restored-token");
+        assertThat(response.role()).isEqualTo("SUPER_ADMIN");
+        assertThat(response.isImpersonating()).isFalse();
+        assertThat(response.originalRole()).isNull();
+        assertThat(response.originalUserId()).isNull();
     }
 }
