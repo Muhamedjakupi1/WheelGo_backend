@@ -30,6 +30,7 @@ public class VehicleResponse {
     private BigDecimal dailyRate;
     private VehicleStatus status;
     private LocalDate rentedUntil;
+    private LocalDate maintenanceUntil;
     private String statusMessage;
     private Integer mileage;
     private String primaryImageUrl;

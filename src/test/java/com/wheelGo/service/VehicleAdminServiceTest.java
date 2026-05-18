@@ -2,7 +2,9 @@ package com.wheelGo.service;
 
 import com.wheelGo.model.bookings.Booking;
 import com.wheelGo.model.enums.BookingStatus;
+import com.wheelGo.model.enums.VehicleStatus;
 import com.wheelGo.model.locations.Location;
+import com.wheelGo.model.maintenance_records.MaintenanceRecord;
 import com.wheelGo.model.vehicle_categories.VehicleCategory;
 import com.wheelGo.model.vehicle_images.VehicleImage;
 import com.wheelGo.model.vehicles.Vehicle;
@@ -11,6 +13,7 @@ import com.wheelGo.model.vehicles.VehicleResponse;
 import com.wheelGo.model.vehicles.VehicleUpdateRequest;
 import com.wheelGo.repository.BookingRepository;
 import com.wheelGo.repository.LocationRepository;
+import com.wheelGo.repository.MaintenanceRecordRepository;
 import com.wheelGo.repository.VehicleCategoryRepository;
 import com.wheelGo.repository.VehicleImageRepository;
 import com.wheelGo.repository.VehicleRepository;
@@ -24,6 +27,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -44,6 +48,7 @@ class VehicleAdminServiceTest {
     @Mock private LocationRepository locationRepository;
     @Mock private VehicleImageRepository vehicleImageRepository;
     @Mock private BookingRepository bookingRepository;
+    @Mock private MaintenanceRecordRepository maintenanceRecordRepository;
     @InjectMocks private VehicleAdminService vehicleAdminService;
 
     private UUID vehicleId;
@@ -87,6 +92,7 @@ class VehicleAdminServiceTest {
         when(vehicleRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(vehicle));
         when(vehicleImageRepository.findByVehicleIdInOrderByUploadedAtDesc(List.of(vehicleId))).thenReturn(List.of(image));
         when(bookingRepository.findAllByVehicleIdAndStatusInOrderByEndDateAsc(any(), any())).thenReturn(List.of(booking));
+        when(maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicleId)).thenReturn(List.of());
 
         List<VehicleResponse> result = vehicleAdminService.getAll();
 
@@ -100,6 +106,7 @@ class VehicleAdminServiceTest {
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
         when(vehicleImageRepository.findByVehicleIdInOrderByUploadedAtDesc(List.of(vehicleId))).thenReturn(List.of());
         when(bookingRepository.findAllByVehicleIdAndStatusInOrderByEndDateAsc(any(), any())).thenReturn(List.of());
+        when(maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicleId)).thenReturn(List.of());
 
         VehicleResponse result = vehicleAdminService.getById(vehicleId);
 
@@ -132,6 +139,7 @@ class VehicleAdminServiceTest {
         when(vehicleRepository.save(any(Vehicle.class))).thenReturn(vehicle);
         when(vehicleImageRepository.findByVehicleIdInOrderByUploadedAtDesc(List.of(vehicleId))).thenReturn(List.of());
         when(bookingRepository.findAllByVehicleIdAndStatusInOrderByEndDateAsc(any(), any())).thenReturn(List.of());
+        when(maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicleId)).thenReturn(List.of());
 
         VehicleResponse result = vehicleAdminService.create(request);
 
@@ -180,10 +188,48 @@ class VehicleAdminServiceTest {
         when(vehicleRepository.save(vehicle)).thenReturn(vehicle);
         when(vehicleImageRepository.findByVehicleIdInOrderByUploadedAtDesc(List.of(vehicleId))).thenReturn(List.of());
         when(bookingRepository.findAllByVehicleIdAndStatusInOrderByEndDateAsc(any(), any())).thenReturn(List.of());
+        when(maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicleId)).thenReturn(List.of());
 
         VehicleResponse result = vehicleAdminService.update(vehicleId, request);
 
         assertThat(result.getMake()).isEqualTo("Audi");
+    }
+
+    @Test
+    void should_return_maintenance_message_with_end_date_when_vehicle_under_maintenance() {
+        MaintenanceRecord maintenanceRecord = new MaintenanceRecord();
+        maintenanceRecord.setNextDueAt(LocalDateTime.now().plusDays(5));
+        vehicle.setStatus(VehicleStatus.MAINTENANCE);
+
+        when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
+        when(vehicleImageRepository.findByVehicleIdInOrderByUploadedAtDesc(List.of(vehicleId))).thenReturn(List.of());
+        when(bookingRepository.findAllByVehicleIdAndStatusInOrderByEndDateAsc(any(), any())).thenReturn(List.of());
+        when(maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicleId))
+                .thenReturn(List.of(maintenanceRecord));
+
+        VehicleResponse result = vehicleAdminService.getById(vehicleId);
+
+        assertThat(result.getStatus()).isEqualTo(VehicleStatus.MAINTENANCE);
+        assertThat(result.getMaintenanceUntil()).isEqualTo(maintenanceRecord.getNextDueAt().toLocalDate());
+        assertThat(result.getStatusMessage()).contains("Under maintenance until");
+    }
+
+    @Test
+    void should_restore_available_status_in_response_when_maintenance_end_date_has_passed() {
+        MaintenanceRecord maintenanceRecord = new MaintenanceRecord();
+        maintenanceRecord.setNextDueAt(LocalDateTime.now().minusDays(1));
+        vehicle.setStatus(VehicleStatus.MAINTENANCE);
+
+        when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
+        when(vehicleImageRepository.findByVehicleIdInOrderByUploadedAtDesc(List.of(vehicleId))).thenReturn(List.of());
+        when(bookingRepository.findAllByVehicleIdAndStatusInOrderByEndDateAsc(any(), any())).thenReturn(List.of());
+        when(maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicleId))
+                .thenReturn(List.of(maintenanceRecord));
+
+        VehicleResponse result = vehicleAdminService.getById(vehicleId);
+
+        assertThat(result.getStatus()).isEqualTo(VehicleStatus.AVAILABLE);
+        assertThat(result.getMaintenanceUntil()).isNull();
     }
 
     @Test

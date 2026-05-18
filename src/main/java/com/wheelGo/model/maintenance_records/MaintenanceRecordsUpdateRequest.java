@@ -2,26 +2,30 @@ package com.wheelGo.model.maintenance_records;
 
 
 import com.wheelGo.model.enums.MaintenanceType;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Getter
 @Setter
 public class MaintenanceRecordsUpdateRequest {
 
-    @NotBlank(message = "Maintenance type is required")
+    @NotNull(message = "Vehicle is required")
+    private UUID vehicleId;
+
+    @NotNull(message = "Maintenance type is required")
     private MaintenanceType type;
 
     @Size(max = 500)
     private String description;
 
-    @NotNull(message = "Cost is required")
+    @PositiveOrZero(message = "Cost cannot be negative")
     private BigDecimal cost;
 
     @NotNull(message = "Performance date is required")
@@ -29,5 +33,5 @@ public class MaintenanceRecordsUpdateRequest {
 
     private LocalDateTime nextDueAt;
 
-    private String performedBy;;
+    private String performedBy;
 }
