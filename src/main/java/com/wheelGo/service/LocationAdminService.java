@@ -17,4 +17,9 @@ public class LocationAdminService {
     public List<LocationResponse> getAll() {
         return locationCrudAdminService.getAll();
     }
+
+    @Transactional(readOnly = true)
+    public List<LocationResponse> getAll(String keyword) {
+        return locationCrudAdminService.getAll(keyword);
+    }
 }
