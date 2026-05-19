@@ -12,7 +12,9 @@ import com.wheelGo.model.enums.AddonType;
 import com.wheelGo.model.enums.BookingStatus;
 import com.wheelGo.model.enums.VehicleStatus;
 import com.wheelGo.model.maintenance_records.MaintenanceRecord;
+import com.wheelGo.model.payments.Payment;
 import com.wheelGo.model.locations.Location;
+import com.wheelGo.model.invoices.Invoice;
 import com.wheelGo.model.tenant.Tenant;
 import com.wheelGo.model.user.User;
 import com.wheelGo.model.vehicle_images.VehicleImage;
@@ -21,6 +23,8 @@ import com.wheelGo.repository.AddonRepository;
 import com.wheelGo.repository.BookingAddonRepository;
 import com.wheelGo.repository.BookingRepository;
 import com.wheelGo.repository.MaintenanceRecordRepository;
+import com.wheelGo.repository.PaymentRepository;
+import com.wheelGo.repository.InvoiceRepository;
 import com.wheelGo.repository.TenantRepository;
 import com.wheelGo.repository.UserRepository;
 import com.wheelGo.repository.VehicleImageRepository;
@@ -72,6 +76,8 @@ public class BookingService {
     private final VehicleRepository vehicleRepository;
     private final VehicleImageRepository vehicleImageRepository;
     private final MaintenanceRecordRepository maintenanceRecordRepository;
+    private final PaymentRepository paymentRepository;
+    private final InvoiceRepository invoiceRepository;
 
     @Transactional
     public BookingResponse createBooking(UUID userId, BookingCreateRequest request) {
@@ -229,14 +235,6 @@ public class BookingService {
         LocalDateTime startDateTime = booking.getStartDate();
         LocalDateTime endDateTime = booking.getEndDate();
 
-        if (request.getStartDate() != null || request.getEndDate() != null) {
-            LocalDate startDate = request.getStartDate() != null ? request.getStartDate() : booking.getStartDate().toLocalDate();
-            LocalDate endDate = request.getEndDate() != null ? request.getEndDate() : booking.getEndDate().toLocalDate();
-            validateBookingDates(startDate, endDate);
-            startDateTime = startDate.atStartOfDay();
-            endDateTime = endDate.atTime(LocalTime.MAX);
-        }
-
         BookingStatus targetStatus = request.getStatus() != null ? request.getStatus() : booking.getStatus();
 
         if (BLOCKING_STATUSES.contains(targetStatus)) {
@@ -245,23 +243,6 @@ public class BookingService {
 
         boolean wasInventoryReserved = RELEASABLE_STATUSES.contains(booking.getStatus());
         boolean shouldReleaseInventory = wasInventoryReserved && isTerminalStatus(targetStatus);
-
-        if (request.getStartDate() != null || request.getEndDate() != null) {
-            booking.setStartDate(startDateTime);
-            booking.setEndDate(endDateTime);
-            booking.setTotalDays(calculateTotalDays(startDateTime.toLocalDate(), endDateTime.toLocalDate()));
-
-            BigDecimal recalculatedBasePrice = normalizeMoney(vehicle.getDailyRate())
-                    .multiply(BigDecimal.valueOf(booking.getTotalDays()))
-                    .setScale(2, RoundingMode.HALF_UP);
-            booking.setBasePrice(recalculatedBasePrice);
-            booking.setTotalPrice(
-                    recalculatedBasePrice
-                            .add(normalizeMoney(booking.getAddonPrice()))
-                            .subtract(normalizeMoney(booking.getDiscountAmount()))
-                            .setScale(2, RoundingMode.HALF_UP)
-            );
-        }
 
         if (request.getAddonCharge() != null && request.getAddonCharge().compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal addonPrice = normalizeMoney(booking.getAddonPrice()).add(normalizeMoney(request.getAddonCharge()));
@@ -320,6 +301,24 @@ public class BookingService {
         Map<UUID, List<BookingAddon>> addonsByBookingId = bookingAddonRepository.findByBookingIdIn(bookingIds).stream()
                 .collect(Collectors.groupingBy(BookingAddon::getBookingId));
 
+        Map<UUID, List<Payment>> paymentsByBookingId = paymentRepository == null
+                ? Collections.emptyMap()
+                : paymentRepository.findAllByBookingIdInOrderByCreatedAtDesc(bookingIds).stream()
+                .collect(Collectors.groupingBy(Payment::getBookingId));
+
+        Map<UUID, Payment> latestPaymentByBookingId = paymentsByBookingId.values().stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toMap(
+                        Payment::getBookingId,
+                        Function.identity(),
+                        (existing, ignored) -> existing
+                ));
+
+        Map<UUID, Invoice> invoiceByBookingId = invoiceRepository == null
+                ? Collections.emptyMap()
+                : invoiceRepository.findByBookingIdIn(bookingIds).stream()
+                .collect(Collectors.toMap(Invoice::getBookingId, Function.identity()));
+
         List<UUID> addonIds = addonsByBookingId.values().stream()
                 .flatMap(List::stream)
                 .map(BookingAddon::getAddonId)
@@ -355,9 +354,17 @@ public class BookingService {
                             .anyMatch(addon -> BABY_SEAT_NAME.equalsIgnoreCase(addon.getName()));
 
                     BookingResponse response = toResponse(booking, vehicle, bookingAddons, babySeatRequested);
+                    Payment latestPayment = latestPaymentByBookingId.get(booking.getId());
+                    Invoice invoice = invoiceByBookingId.get(booking.getId());
                     response.setVehicleImageUrl(primaryImageByVehicleId.get(booking.getVehicleId()));
                     response.setAddonNames(addonNames);
                     response.setCustomerEmail(user != null ? user.getEmail() : null);
+                    if (latestPayment != null) {
+                        response.setPaymentStatus(latestPayment.getStatus());
+                        response.setPaymentMethod(latestPayment.getMethod());
+                    }
+                    response.setInvoiceNumber(invoice != null ? invoice.getInvoiceNumber() : null);
+                    applyPaymentSummary(response, latestPayment, paymentsByBookingId.getOrDefault(booking.getId(), List.of()));
                     return response;
                 })
                 .toList();
@@ -405,6 +412,18 @@ public class BookingService {
         }
 
         return response;
+    }
+
+    private void applyPaymentSummary(BookingResponse response, Payment latestPayment, List<Payment> bookingPayments) {
+        BigDecimal totalPrice = normalizeMoney(response.getTotalPrice());
+        BigDecimal paidAmount = bookingPayments.stream()
+                .filter(payment -> payment.getStatus() == com.wheelGo.model.enums.PaymentStatus.PAID)
+                .map(Payment::getAmount)
+                .map(this::normalizeMoney)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        response.setPaidAmount(paidAmount);
+        response.setOutstandingAmount(totalPrice.subtract(paidAmount).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
     }
 
     private BookingResponse toResponseWithDetails(Booking booking) {
@@ -564,7 +583,7 @@ public class BookingService {
 
     private int calculateTotalDays(LocalDate startDate, LocalDate endDate) {
         long diff = ChronoUnit.DAYS.between(startDate, endDate);
-        return (int) Math.max(diff, 1);
+        return (int) Math.max(diff + 1, 1);
     }
 
     private void validateBookingDates(LocalDate startDate, LocalDate endDate) {
