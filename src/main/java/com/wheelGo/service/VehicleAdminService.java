@@ -1,10 +1,11 @@
 package com.wheelGo.service;
 
+import com.wheelGo.config.CacheNames;
 import com.wheelGo.model.bookings.BookingResponse;
 import com.wheelGo.model.bookings.Booking;
-import com.wheelGo.model.locations.Location;
 import com.wheelGo.model.enums.BookingStatus;
 import com.wheelGo.model.enums.VehicleStatus;
+import com.wheelGo.model.locations.Location;
 import com.wheelGo.model.maintenance_records.MaintenanceRecord;
 import com.wheelGo.model.vehicle_categories.VehicleCategory;
 import com.wheelGo.model.vehicle_images.VehicleImage;
@@ -19,6 +20,10 @@ import com.wheelGo.repository.VehicleCategoryRepository;
 import com.wheelGo.repository.VehicleImageRepository;
 import com.wheelGo.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -31,12 +36,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class VehicleAdminService {
+
     private static final String VEHICLE_IN_USE_MESSAGE =
             "This vehicle cannot be deleted because it is already used in one or more bookings.";
     private static final EnumSet<BookingStatus> BLOCKING_BOOKING_STATUSES =
@@ -52,17 +57,22 @@ public class VehicleAdminService {
     private final MaintenanceRecordRepository maintenanceRecordRepository;
 
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheNames.VEHICLES, key = "'all'")
     public List<VehicleResponse> getAll() {
-        List<Vehicle> vehicles = vehicleRepository.findAllByOrderByCreatedAtDesc();
-        return toResponses(vehicles);
+        return toResponses(vehicleRepository.findAllByOrderByCreatedAtDesc());
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheNames.VEHICLES, key = "'byId:' + #id")
     public VehicleResponse getById(UUID id) {
         return toResponses(List.of(findVehicle(id))).getFirst();
     }
 
     @Transactional
+    @Caching(
+            put = @CachePut(value = CacheNames.VEHICLES, key = "'byId:' + #result.id"),
+            evict = @CacheEvict(value = CacheNames.VEHICLES, key = "'all'")
+    )
     public VehicleResponse create(VehicleRequest request) {
         validateUniqueFields(request.getPlateNumber(), request.getVin(), null);
 
@@ -75,6 +85,10 @@ public class VehicleAdminService {
     }
 
     @Transactional
+    @Caching(
+            put = @CachePut(value = CacheNames.VEHICLES, key = "'byId:' + #result.id"),
+            evict = @CacheEvict(value = CacheNames.VEHICLES, key = "'all'")
+    )
     public VehicleResponse update(UUID id, VehicleUpdateRequest request) {
         Vehicle vehicle = findVehicle(id);
 
@@ -108,6 +122,10 @@ public class VehicleAdminService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = CacheNames.VEHICLES, key = "'byId:' + #id"),
+            @CacheEvict(value = CacheNames.VEHICLES, key = "'all'")
+    })
     public void delete(UUID id) {
         Vehicle vehicle = findVehicle(id);
         try {

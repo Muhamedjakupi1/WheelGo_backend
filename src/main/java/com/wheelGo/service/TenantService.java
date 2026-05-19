@@ -1,5 +1,6 @@
 package com.wheelGo.service;
 
+import com.wheelGo.config.CacheNames;
 import com.wheelGo.mapper.TenantMapper;
 import com.wheelGo.model.enums.AuditAction;
 import com.wheelGo.model.enums.Role;
@@ -17,6 +18,8 @@ import com.wheelGo.security.ReservedTenantSlugs;
 import com.wheelGo.validation.PasswordPolicy;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,6 +48,7 @@ public class TenantService {
     private final TenantSettingsService tenantSettingsService;
 
     @Transactional
+    @CacheEvict(value = CacheNames.TENANTS, allEntries = true)
     public TenantResponse createTenant(TenantRequest req) {
         String normalizedSlug = normalizeSlug(req.getSlug());
 
@@ -99,6 +103,8 @@ public class TenantService {
         return toResponse(savedTenant, settings);
     }
 
+    @Transactional(readOnly = true)
+    @Cacheable(value = CacheNames.TENANTS, key = "'all'")
     public List<TenantResponse> getAll() {
         return tenantRepository.findAll().stream()
                 .map(tenant -> toResponse(tenant, tenantSettingsService.getForTenant(tenant.getSchemaName())))
@@ -106,6 +112,7 @@ public class TenantService {
     }
 
     @Transactional
+    @CacheEvict(value = CacheNames.TENANTS, allEntries = true)
     public void deleteTenant(UUID id) {
         Tenant tenant = tenantRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Tenant not found."));
@@ -123,6 +130,7 @@ public class TenantService {
     }
 
     @Transactional
+    @CacheEvict(value = CacheNames.TENANTS, allEntries = true)
     public TenantResponse updateTenant(UUID id, TenantUpdateRequest req) {
         Tenant tenant = tenantRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Tenant not found."));

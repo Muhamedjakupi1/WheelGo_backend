@@ -1,5 +1,6 @@
 package com.wheelGo.service;
 
+import com.wheelGo.config.CacheNames;
 import com.wheelGo.model.enums.Role;
 import com.wheelGo.model.user.User;
 import com.wheelGo.model.user.UserResponse;
@@ -10,7 +11,12 @@ import com.wheelGo.model.vehicles.VehicleResponse;
 import com.wheelGo.repository.UserRepository;
 import com.wheelGo.security.CustomUserPrincipal;
 import com.wheelGo.validation.PasswordPolicy;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -35,6 +41,7 @@ public class UserAdminService {
     private final EntityManager entityManager;
 
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheNames.USERS, key = "'all:' + @adminAccessService.requireCurrentTenantId()")
     public List<UserResponse> getAll() {
         UUID tenantId = adminAccessService.requireCurrentTenantId();
         return userRepository.findAllByTenantIdAndRoleOrderByCreatedAtDesc(tenantId, Role.USER)
@@ -44,12 +51,17 @@ public class UserAdminService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = CacheNames.USERS, key = "'byId:' + @adminAccessService.requireCurrentTenantId() + ':' + #id")
     public UserResponse getById(UUID id) {
         UUID tenantId = adminAccessService.requireCurrentTenantId();
         return toResponse(findUser(id, tenantId));
     }
 
     @Transactional
+    @Caching(
+            put = @CachePut(value = CacheNames.USERS, key = "'byId:' + @adminAccessService.requireCurrentTenantId() + ':' + #result.id"),
+            evict = @CacheEvict(value = CacheNames.USERS, key = "'all:' + @adminAccessService.requireCurrentTenantId()")
+    )
     public UserResponse update(UUID id, UserUpdateRequest request) {
         UUID tenantId = adminAccessService.requireCurrentTenantId();
         CustomUserPrincipal principal = adminAccessService.requireCurrentPrincipal();
@@ -86,6 +98,10 @@ public class UserAdminService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = CacheNames.USERS, key = "'byId:' + @adminAccessService.requireCurrentTenantId() + ':' + #id"),
+            @CacheEvict(value = CacheNames.USERS, key = "'all:' + @adminAccessService.requireCurrentTenantId()")
+    })
     public void delete(UUID id) {
         UUID tenantId = adminAccessService.requireCurrentTenantId();
         CustomUserPrincipal principal = adminAccessService.requireCurrentPrincipal();
@@ -147,6 +163,7 @@ public class UserAdminService {
         entityManager.createNativeQuery("DELETE FROM bookings WHERE user_id = :userId")
                 .setParameter("userId", id)
                 .executeUpdate();
+
         userRepository.delete(user);
     }
 

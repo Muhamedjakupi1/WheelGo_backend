@@ -36,6 +36,7 @@ class MaintenanceAdminServiceTest {
     @Mock private MaintenanceRecordRepository maintenanceRecordRepository;
     @Mock private VehicleRepository vehicleRepository;
     @Mock private BookingRepository bookingRepository;
+    @Mock private CacheInvalidationService cacheInvalidationService;
     @InjectMocks private MaintenanceAdminService maintenanceAdminService;
 
     private UUID vehicleId;

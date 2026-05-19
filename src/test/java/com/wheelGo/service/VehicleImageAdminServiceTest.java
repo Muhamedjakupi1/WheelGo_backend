@@ -30,6 +30,7 @@ class VehicleImageAdminServiceTest {
     @Mock private VehicleImageRepository vehicleImageRepository;
     @Mock private VehicleRepository vehicleRepository;
     @Mock private FileStorageService fileStorageService;
+    @Mock private CacheInvalidationService cacheInvalidationService;
     @InjectMocks private VehicleImageAdminService vehicleImageAdminService;
 
     private UUID vehicleId;
