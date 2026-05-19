@@ -2,9 +2,11 @@ package com.wheelGo.controller;
 
 import com.wheelGo.model.user.UserResponse;
 import com.wheelGo.model.user.UserUpdateRequest;
+import com.wheelGo.model.vehicles.VehicleResponse;
 import com.wheelGo.service.UserAdminService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +23,11 @@ public class UserAdminController {
     private final UserAdminService userAdminService;
 
     @GetMapping
-    public ResponseEntity<List<UserResponse>> getAll() {
+    public ResponseEntity<List<UserResponse>> getAll(
+            @RequestParam(value = "keyword", required = false) String keyword) {
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            return ResponseEntity.ok(userAdminService.searchUser(keyword));
+        }
         return ResponseEntity.ok(userAdminService.getAll());
     }
 
@@ -41,4 +47,5 @@ public class UserAdminController {
         userAdminService.delete(id);
         return ResponseEntity.noContent().build();
     }
+
 }

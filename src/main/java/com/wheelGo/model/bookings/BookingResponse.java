@@ -1,6 +1,8 @@
 package com.wheelGo.model.bookings;
 
 import com.wheelGo.model.enums.BookingStatus;
+import com.wheelGo.model.enums.PaymentMethod;
+import com.wheelGo.model.enums.PaymentStatus;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -25,6 +27,8 @@ public class BookingResponse {
     private BigDecimal discountAmount;
     private BigDecimal addonPrice;
     private BigDecimal totalPrice;
+    private BigDecimal paidAmount;
+    private BigDecimal outstandingAmount;
     private BookingStatus status;
     private String notes;
     private String specialRequest;
@@ -34,6 +38,9 @@ public class BookingResponse {
     private String vehicleImageUrl;
     private String locationName;
     private String customerEmail;
+    private PaymentStatus paymentStatus;
+    private PaymentMethod paymentMethod;
+    private String invoiceNumber;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

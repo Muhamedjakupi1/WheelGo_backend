@@ -22,8 +22,10 @@ public class VehicleImageAdminController {
     private final VehicleImageAdminService vehicleImageAdminService;
 
     @GetMapping
-    public ResponseEntity<List<VehicleImageResponse>> getAll(@RequestParam(required = false) UUID vehicleId) {
-        return ResponseEntity.ok(vehicleImageAdminService.getAll(vehicleId));
+    public ResponseEntity<List<VehicleImageResponse>> getAll(
+            @RequestParam(required = false) UUID vehicleId,
+            @RequestParam(value = "keyword", required = false) String keyword) {
+        return ResponseEntity.ok(vehicleImageAdminService.getAll(vehicleId, keyword));
     }
 
     @GetMapping("/{id}")

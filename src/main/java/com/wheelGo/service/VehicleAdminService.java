@@ -1,6 +1,7 @@
 package com.wheelGo.service;
 
 import com.wheelGo.config.CacheNames;
+import com.wheelGo.model.bookings.BookingResponse;
 import com.wheelGo.model.bookings.Booking;
 import com.wheelGo.model.enums.BookingStatus;
 import com.wheelGo.model.enums.VehicleStatus;
@@ -333,6 +334,9 @@ public class VehicleAdminService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
+    public List<VehicleResponse> searchVehicle(String keyword) {
+        List<Vehicle> vehicles = vehicleRepository.searchVehicle(keyword.trim());
+        return toResponses(vehicles);
     private record MaintenanceAvailability(boolean active, java.time.LocalDate availableFrom) {
     }
 }

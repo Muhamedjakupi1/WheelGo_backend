@@ -23,8 +23,9 @@ public class VehicleCategoryAdminController {
     private final VehicleCategoryAdminService vehicleCategoryAdminService;
 
     @GetMapping
-    public ResponseEntity<List<VehicleCategoryResponse>> getAll() {
-        return ResponseEntity.ok(vehicleCategoryAdminService.getAll());
+    public ResponseEntity<List<VehicleCategoryResponse>> getAll(
+            @RequestParam(value = "keyword", required = false) String keyword) {
+        return ResponseEntity.ok(vehicleCategoryAdminService.getAll(keyword));
     }
 
     @GetMapping("/{id}")
