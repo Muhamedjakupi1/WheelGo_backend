@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -32,8 +33,9 @@ public class LocationAdminController {
     private final LocationCrudAdminService locationCrudAdminService;
 
     @GetMapping
-    public ResponseEntity<List<LocationResponse>> getAll() {
-        return ResponseEntity.ok(locationAdminService.getAll());
+    public ResponseEntity<List<LocationResponse>> getAll(
+            @RequestParam(value = "keyword", required = false) String keyword) {
+        return ResponseEntity.ok(locationAdminService.getAll(keyword));
     }
 
     @GetMapping("/{id}")

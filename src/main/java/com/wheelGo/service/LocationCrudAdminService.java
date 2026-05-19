@@ -38,6 +38,16 @@ public class LocationCrudAdminService {
     }
 
     @Transactional(readOnly = true)
+    public List<LocationResponse> getAll(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return getAll();
+        }
+        return locationRepository.searchLocations(keyword.trim()).stream()
+                .map(locationMapper::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public LocationResponse getById(UUID id) {
         return locationMapper.toResponse(findLocation(id));
     }

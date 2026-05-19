@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -27,8 +28,9 @@ public class BookingAdminController {
     private final BookingService bookingService;
 
     @GetMapping
-    public ResponseEntity<List<BookingResponse>> getAll() {
-        return ResponseEntity.ok(bookingService.getBookingsForAdmin());
+    public ResponseEntity<List<BookingResponse>> getAll(
+            @RequestParam(value = "keyword", required = false) String keyword) {
+        return ResponseEntity.ok(bookingService.getBookingsForAdmin(keyword));
     }
 
     @PatchMapping("/{id}")

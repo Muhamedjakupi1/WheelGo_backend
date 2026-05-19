@@ -172,9 +172,27 @@ public class BookingService {
     }
 
     @Transactional
+    public List<BookingResponse> getBookingsForUser(UUID userId, String keyword) {
+        releaseFinishedAddonInventory();
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return toResponses(bookingRepository.findAllByUserIdOrderByCreatedAtDesc(userId));
+        }
+        return toResponses(bookingRepository.searchBookingsForUser(userId, keyword.trim()));
+    }
+
+    @Transactional
     public List<BookingResponse> getBookingsForAdmin() {
         releaseFinishedAddonInventory();
         return toResponses(bookingRepository.findAllByOrderByCreatedAtDesc());
+    }
+
+    @Transactional
+    public List<BookingResponse> getBookingsForAdmin(String keyword) {
+        releaseFinishedAddonInventory();
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return toResponses(bookingRepository.findAllByOrderByCreatedAtDesc());
+        }
+        return toResponses(bookingRepository.searchBookingsForAdmin(keyword.trim()));
     }
 
     @Transactional

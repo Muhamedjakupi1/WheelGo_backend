@@ -35,6 +35,17 @@ public class VehicleCategoryAdminService {
     }
 
     @Transactional(readOnly = true)
+    public List<VehicleCategoryResponse> getAll(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return getAll();
+        }
+        return vehicleCategoryRepository.searchVehicleCategories(keyword.trim())
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public VehicleCategoryResponse getById(UUID id) {
         return toResponse(findCategory(id));
     }
