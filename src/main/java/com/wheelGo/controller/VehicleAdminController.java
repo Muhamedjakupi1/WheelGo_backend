@@ -1,5 +1,6 @@
 package com.wheelGo.controller;
 
+import com.wheelGo.model.bookings.BookingResponse;
 import com.wheelGo.model.vehicles.VehicleRequest;
 import com.wheelGo.model.vehicles.VehicleResponse;
 import com.wheelGo.model.vehicles.VehicleUpdateRequest;
@@ -23,7 +24,12 @@ public class VehicleAdminController {
     private final VehicleAdminService vehicleAdminService;
 
     @GetMapping
-    public ResponseEntity<List<VehicleResponse>> getAll() {
+    public ResponseEntity<List<VehicleResponse>> getAll(
+            @RequestParam(value = "keyword", required = false) String keyword) {
+
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            return ResponseEntity.ok(vehicleAdminService.searchVehicle(keyword));
+        }
         return ResponseEntity.ok(vehicleAdminService.getAll());
     }
 
@@ -47,5 +53,11 @@ public class VehicleAdminController {
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         vehicleAdminService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+        @GetMapping("/")
+    public ResponseEntity<List<VehicleResponse>> searchBooking(String keyword){
+        List<VehicleResponse> vehicles = vehicleAdminService.searchVehicle(keyword);
+        return new ResponseEntity<>(vehicles, HttpStatus.OK);
     }
 }

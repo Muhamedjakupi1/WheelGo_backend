@@ -1,5 +1,6 @@
 package com.wheelGo.service;
 
+import com.wheelGo.model.bookings.BookingResponse;
 import com.wheelGo.model.locations.Location;
 import com.wheelGo.model.enums.BookingStatus;
 import com.wheelGo.model.vehicle_categories.VehicleCategory;
@@ -248,5 +249,10 @@ public class VehicleAdminService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    public List<VehicleResponse> searchVehicle(String keyword) {
+        List<Vehicle> vehicles = vehicleRepository.searchVehicle(keyword.trim());
+        return toResponses(vehicles);
     }
 }
