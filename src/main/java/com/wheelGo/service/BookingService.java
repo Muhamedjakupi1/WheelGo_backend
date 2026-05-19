@@ -11,6 +11,7 @@ import com.wheelGo.model.bookings.BookingSelectedAddonRequest;
 import com.wheelGo.model.enums.AddonType;
 import com.wheelGo.model.enums.BookingStatus;
 import com.wheelGo.model.enums.VehicleStatus;
+import com.wheelGo.model.maintenance_records.MaintenanceRecord;
 import com.wheelGo.model.locations.Location;
 import com.wheelGo.model.tenant.Tenant;
 import com.wheelGo.model.user.User;
@@ -19,6 +20,7 @@ import com.wheelGo.model.vehicles.Vehicle;
 import com.wheelGo.repository.AddonRepository;
 import com.wheelGo.repository.BookingAddonRepository;
 import com.wheelGo.repository.BookingRepository;
+import com.wheelGo.repository.MaintenanceRecordRepository;
 import com.wheelGo.repository.TenantRepository;
 import com.wheelGo.repository.UserRepository;
 import com.wheelGo.repository.VehicleImageRepository;
@@ -69,6 +71,7 @@ public class BookingService {
     private final UserRepository userRepository;
     private final VehicleRepository vehicleRepository;
     private final VehicleImageRepository vehicleImageRepository;
+    private final MaintenanceRecordRepository maintenanceRecordRepository;
 
     @Transactional
     public BookingResponse createBooking(UUID userId, BookingCreateRequest request) {
@@ -84,7 +87,7 @@ public class BookingService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vehicle location is not configured");
         }
 
-        if (vehicle.getStatus() != VehicleStatus.AVAILABLE) {
+        if (vehicle.getStatus() == VehicleStatus.INACTIVE) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vehicle is not available for booking");
         }
 
@@ -596,6 +599,8 @@ public class BookingService {
                                              LocalDateTime startDateTime,
                                              LocalDateTime endDateTime,
                                              UUID excludedBookingId) {
+        ensureMaintenanceWindowAllowsBooking(vehicleId, startDateTime.toLocalDate());
+
         List<Booking> conflicts = bookingRepository
                 .findAllByVehicleIdAndStatusInAndStartDateLessThanAndEndDateGreaterThanOrderByEndDateAsc(
                         vehicleId,
@@ -623,6 +628,31 @@ public class BookingService {
         );
     }
 
+    private void ensureMaintenanceWindowAllowsBooking(UUID vehicleId, LocalDate requestedStartDate) {
+        MaintenanceAvailability maintenanceAvailability = resolveMaintenanceAvailability(vehicleId);
+        if (!maintenanceAvailability.active()) {
+            return;
+        }
+
+        LocalDate availableFrom = maintenanceAvailability.availableFrom();
+        if (availableFrom != null && !requestedStartDate.isBefore(availableFrom)) {
+            return;
+        }
+
+        if (availableFrom != null) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Vehicle is under maintenance until " + availableFrom.format(DateTimeFormatter.ofPattern("d MMM yyyy")) +
+                            " and cannot be booked for the selected dates."
+            );
+        }
+
+        throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Vehicle is under maintenance and is not available for booking right now."
+        );
+    }
+
     private void syncVehicleStatus(UUID vehicleId) {
         if (vehicleId == null) {
             return;
@@ -633,12 +663,28 @@ public class BookingService {
             return;
         }
 
-        Optional<Booking> latestBlockingBooking = bookingRepository
+        if (vehicle.getStatus() == VehicleStatus.INACTIVE) {
+            return;
+        }
+
+        MaintenanceAvailability maintenanceAvailability = resolveMaintenanceAvailability(vehicleId);
+        if (maintenanceAvailability.active()) {
+            if (vehicle.getStatus() != VehicleStatus.MAINTENANCE) {
+                vehicle.setStatus(VehicleStatus.MAINTENANCE);
+                vehicle.setUpdatedAt(LocalDateTime.now());
+                vehicleRepository.save(vehicle);
+            }
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        Optional<Booking> activeBlockingBooking = bookingRepository
                 .findAllByVehicleIdAndStatusInOrderByEndDateAsc(vehicleId, BLOCKING_STATUSES)
                 .stream()
+                .filter(booking -> !booking.getStartDate().isAfter(now) && !booking.getEndDate().isBefore(now))
                 .max((left, right) -> left.getEndDate().compareTo(right.getEndDate()));
 
-        if (latestBlockingBooking.isPresent()) {
+        if (activeBlockingBooking.isPresent()) {
             if (vehicle.getStatus() != VehicleStatus.RENTED) {
                 vehicle.setStatus(VehicleStatus.RENTED);
                 vehicle.setUpdatedAt(LocalDateTime.now());
@@ -652,6 +698,27 @@ public class BookingService {
             vehicle.setUpdatedAt(LocalDateTime.now());
             vehicleRepository.save(vehicle);
         }
+    }
+
+    private MaintenanceAvailability resolveMaintenanceAvailability(UUID vehicleId) {
+        List<MaintenanceRecord> records = maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicleId);
+        if (records.isEmpty()) {
+            return new MaintenanceAvailability(false, null);
+        }
+
+        if (records.stream().anyMatch(record -> record.getNextDueAt() == null)) {
+            return new MaintenanceAvailability(true, null);
+        }
+
+        LocalDate availableFrom = records.stream()
+                .map(MaintenanceRecord::getNextDueAt)
+                .filter(Objects::nonNull)
+                .map(LocalDateTime::toLocalDate)
+                .max(LocalDate::compareTo)
+                .orElse(null);
+
+        boolean active = availableFrom != null && LocalDate.now().isBefore(availableFrom);
+        return new MaintenanceAvailability(active, availableFrom);
     }
 
     private String readLocationName(Location location) {
@@ -734,4 +801,6 @@ public class BookingService {
     private record SelectedAddon(Addon addon, int quantity) {
     }
 
+    private record MaintenanceAvailability(boolean active, LocalDate availableFrom) {
+    }
 }

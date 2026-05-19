@@ -1,11 +1,8 @@
 package com.wheelGo.controller;
 
-import com.wheelGo.model.user.User;
-import com.wheelGo.repository.TenantRepository;
-import com.wheelGo.repository.UserRepository;
 import com.wheelGo.auth.AuthResponse;
 import com.wheelGo.security.CustomUserPrincipal;
-import com.wheelGo.security.JwtUtils;
+import com.wheelGo.service.ImpersonationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -17,16 +14,17 @@ import java.util.UUID;
 @CrossOrigin(origins = "http://localhost:5173")
 public class ImpersonationController {
 
-    private final UserRepository userRepository;
-    private final TenantRepository tenantRepository;
-    private final JwtUtils jwtUtils;
+    private final ImpersonationService impersonationService;
 
-    public ImpersonationController(UserRepository userRepository,
-                                   TenantRepository tenantRepository,
-                                   JwtUtils jwtUtils) {
-        this.userRepository = userRepository;
-        this.tenantRepository = tenantRepository;
-        this.jwtUtils = jwtUtils;
+    public ImpersonationController(ImpersonationService impersonationService) {
+        this.impersonationService = impersonationService;
+    }
+
+    @PostMapping("/start/{tenantSlug}")
+    @PreAuthorize("hasRole('SUPER_ADMIN') and !principal.impersonating")
+    public ResponseEntity<?> start(@PathVariable String tenantSlug,
+                                   @org.springframework.security.core.annotation.AuthenticationPrincipal CustomUserPrincipal superAdmin) {
+        return ResponseEntity.ok(impersonationService.startForTenant(tenantSlug, superAdmin));
     }
 
     @PostMapping("/start/{tenantSlug}/{targetUserId}")
@@ -34,83 +32,12 @@ public class ImpersonationController {
     public ResponseEntity<?> start(@PathVariable String tenantSlug,
                                    @PathVariable UUID targetUserId,
                                    @org.springframework.security.core.annotation.AuthenticationPrincipal CustomUserPrincipal superAdmin) {
-
-        var tenant = tenantRepository.findBySlug(tenantSlug)
-                .orElseThrow(() -> new RuntimeException("Tenant not found"));
-
-        User target = userRepository.findByIdAndTenantId(targetUserId, tenant.getId())
-                .orElseThrow(() -> new RuntimeException("User not found in this tenant"));
-
-        CustomUserPrincipal targetPrincipal = new CustomUserPrincipal(
-                target.getId(),
-                target.getEmail(),
-                target.getPasswordHash(),
-                JwtUtils.credentialVersion(target.getPasswordHash()),
-                target.getRole().name(),
-                tenant.getId(),
-                tenant.getSlug(),
-                true,
-                superAdmin.getRole(),
-                superAdmin.getUserId()
-        );
-
-        String token = jwtUtils.generateImpersonationToken(
-                targetPrincipal,
-                superAdmin.getUserId(),
-                superAdmin.getRole()
-        );
-
-        return ResponseEntity.ok(new AuthResponse(
-                token,
-                target.getEmail(),
-                target.getRole().name(),
-                target.getId(),
-                tenant.getId(),
-                tenant.getSlug(),
-                true,
-                superAdmin.getRole(),
-                superAdmin.getUserId()
-        ));
+        return ResponseEntity.ok(impersonationService.startForTenant(tenantSlug, superAdmin));
     }
 
     @PostMapping("/stop")
     @PreAuthorize("isAuthenticated() and principal.impersonating")
     public ResponseEntity<?> stop(@org.springframework.security.core.annotation.AuthenticationPrincipal CustomUserPrincipal current) {
-        if (!current.isImpersonating()) {
-            return ResponseEntity.badRequest().body("Not currently impersonating");
-        }
-
-        User superAdmin = userRepository.findById(current.getOriginalUserId())
-                .orElseThrow(() -> new RuntimeException("Original admin not found"));
-
-        String slug = superAdmin.getTenant() != null ? superAdmin.getTenant().getSlug() : null;
-        var tenantId = superAdmin.getTenant() != null ? superAdmin.getTenant().getId() : null;
-
-        CustomUserPrincipal original = new CustomUserPrincipal(
-                superAdmin.getId(),
-                superAdmin.getEmail(),
-                superAdmin.getPasswordHash(),
-                JwtUtils.credentialVersion(superAdmin.getPasswordHash()),
-                superAdmin.getRole().name(),
-                tenantId,
-                slug,
-                false,
-                null,
-                null
-        );
-
-        String token = jwtUtils.generateToken(original);
-
-        return ResponseEntity.ok(new AuthResponse(
-                token,
-                superAdmin.getEmail(),
-                superAdmin.getRole().name(),
-                superAdmin.getId(),
-                tenantId,
-                slug,
-                false,
-                null,
-                null
-        ));
+        return ResponseEntity.ok(impersonationService.stop(current));
     }
 }

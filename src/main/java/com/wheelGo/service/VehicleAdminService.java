@@ -1,8 +1,11 @@
 package com.wheelGo.service;
 
 import com.wheelGo.model.bookings.BookingResponse;
+import com.wheelGo.model.bookings.Booking;
 import com.wheelGo.model.locations.Location;
 import com.wheelGo.model.enums.BookingStatus;
+import com.wheelGo.model.enums.VehicleStatus;
+import com.wheelGo.model.maintenance_records.MaintenanceRecord;
 import com.wheelGo.model.vehicle_categories.VehicleCategory;
 import com.wheelGo.model.vehicle_images.VehicleImage;
 import com.wheelGo.model.vehicles.Vehicle;
@@ -11,6 +14,7 @@ import com.wheelGo.model.vehicles.VehicleResponse;
 import com.wheelGo.model.vehicles.VehicleUpdateRequest;
 import com.wheelGo.repository.BookingRepository;
 import com.wheelGo.repository.LocationRepository;
+import com.wheelGo.repository.MaintenanceRecordRepository;
 import com.wheelGo.repository.VehicleCategoryRepository;
 import com.wheelGo.repository.VehicleImageRepository;
 import com.wheelGo.repository.VehicleRepository;
@@ -25,6 +29,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -37,12 +42,14 @@ public class VehicleAdminService {
     private static final EnumSet<BookingStatus> BLOCKING_BOOKING_STATUSES =
             EnumSet.of(BookingStatus.CONFIRMED, BookingStatus.ACTIVE);
     private static final DateTimeFormatter RENTED_UNTIL_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final DateTimeFormatter MAINTENANCE_UNTIL_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final VehicleRepository vehicleRepository;
     private final VehicleCategoryRepository vehicleCategoryRepository;
     private final LocationRepository locationRepository;
     private final VehicleImageRepository vehicleImageRepository;
     private final BookingRepository bookingRepository;
+    private final MaintenanceRecordRepository maintenanceRecordRepository;
 
     @Transactional(readOnly = true)
     public List<VehicleResponse> getAll() {
@@ -200,6 +207,12 @@ public class VehicleAdminService {
 
     private VehicleResponse toResponse(Vehicle vehicle, List<VehicleImage> images) {
         VehicleResponse response = new VehicleResponse();
+        List<Booking> blockingBookings = bookingRepository.findAllByVehicleIdAndStatusInOrderByEndDateAsc(vehicle.getId(), BLOCKING_BOOKING_STATUSES);
+        List<MaintenanceRecord> maintenanceRecords =
+                maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicle.getId());
+        MaintenanceAvailability maintenanceAvailability = resolveMaintenanceAvailability(maintenanceRecords);
+        VehicleStatus effectiveStatus = resolveEffectiveStatus(vehicle, blockingBookings, maintenanceRecords, maintenanceAvailability);
+
         response.setId(vehicle.getId());
         response.setCategoryId(vehicle.getCategory() != null ? vehicle.getCategory().getId() : null);
         response.setCategoryName(vehicle.getCategory() != null ? vehicle.getCategory().getName() : null);
@@ -215,12 +228,22 @@ public class VehicleAdminService {
         response.setTransmission(vehicle.getTransmission());
         response.setSeats(vehicle.getSeats());
         response.setDailyRate(vehicle.getDailyRate());
-        response.setStatus(vehicle.getStatus());
-        bookingRepository.findAllByVehicleIdAndStatusInOrderByEndDateAsc(vehicle.getId(), BLOCKING_BOOKING_STATUSES)
-                .stream()
+        response.setStatus(effectiveStatus);
+        if (maintenanceAvailability.active()) {
+            response.setMaintenanceUntil(maintenanceAvailability.availableFrom());
+            response.setStatusMessage(
+                    maintenanceAvailability.availableFrom() != null
+                            ? "Under maintenance until " + maintenanceAvailability.availableFrom().format(MAINTENANCE_UNTIL_FORMATTER)
+                            : "Under maintenance"
+            );
+        }
+        blockingBookings.stream()
                 .map(booking -> booking.getEndDate().toLocalDate())
                 .max(java.time.LocalDate::compareTo)
                 .ifPresent(rentedUntil -> {
+                    if (response.getStatus() == VehicleStatus.MAINTENANCE) {
+                        return;
+                    }
                     response.setRentedUntil(rentedUntil);
                     response.setStatusMessage("Rented until " + rentedUntil.format(RENTED_UNTIL_FORMATTER));
                 });
@@ -233,6 +256,48 @@ public class VehicleAdminService {
                 .map(VehicleImage::getUrl)
                 .orElse(null));
         return response;
+    }
+
+    private VehicleStatus resolveEffectiveStatus(Vehicle vehicle,
+                                                 List<Booking> blockingBookings,
+                                                 List<MaintenanceRecord> maintenanceRecords,
+                                                 MaintenanceAvailability maintenanceAvailability) {
+        if (vehicle.getStatus() == VehicleStatus.INACTIVE) {
+            return VehicleStatus.INACTIVE;
+        }
+
+        if (maintenanceAvailability.active()) {
+            return VehicleStatus.MAINTENANCE;
+        }
+
+        if (vehicle.getStatus() == VehicleStatus.MAINTENANCE && !maintenanceRecords.isEmpty()) {
+            java.time.LocalDateTime now = java.time.LocalDateTime.now();
+            boolean hasActiveBooking = blockingBookings.stream()
+                    .anyMatch(booking -> !booking.getStartDate().isAfter(now) && !booking.getEndDate().isBefore(now));
+            return hasActiveBooking ? VehicleStatus.RENTED : VehicleStatus.AVAILABLE;
+        }
+
+        return vehicle.getStatus();
+    }
+
+    private MaintenanceAvailability resolveMaintenanceAvailability(List<MaintenanceRecord> records) {
+        if (records.isEmpty()) {
+            return new MaintenanceAvailability(false, null);
+        }
+
+        if (records.stream().anyMatch(record -> record.getNextDueAt() == null)) {
+            return new MaintenanceAvailability(true, null);
+        }
+
+        java.time.LocalDate availableFrom = records.stream()
+                .map(MaintenanceRecord::getNextDueAt)
+                .filter(Objects::nonNull)
+                .map(java.time.LocalDateTime::toLocalDate)
+                .max(java.time.LocalDate::compareTo)
+                .orElse(null);
+
+        boolean active = availableFrom != null && java.time.LocalDate.now().isBefore(availableFrom);
+        return new MaintenanceAvailability(active, availableFrom);
     }
 
     private String requiredTrimmed(String value, String message) {
@@ -254,5 +319,6 @@ public class VehicleAdminService {
     public List<VehicleResponse> searchVehicle(String keyword) {
         List<Vehicle> vehicles = vehicleRepository.searchVehicle(keyword.trim());
         return toResponses(vehicles);
+    private record MaintenanceAvailability(boolean active, java.time.LocalDate availableFrom) {
     }
 }
