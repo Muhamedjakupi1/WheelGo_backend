@@ -19,6 +19,7 @@ public class PaymentResponse {
     private PaymentMethod method;
     private PaymentStatus status;
     private String gatewayRef;
+    private String invoiceNumber;
     private LocalDateTime paidAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
