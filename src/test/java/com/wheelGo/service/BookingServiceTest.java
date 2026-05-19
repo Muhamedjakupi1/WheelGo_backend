@@ -52,6 +52,7 @@ class BookingServiceTest {
     @Mock private VehicleRepository vehicleRepository;
     @Mock private VehicleImageRepository vehicleImageRepository;
     @Mock private MaintenanceRecordRepository maintenanceRecordRepository;
+    @Mock private CacheInvalidationService cacheInvalidationService;
     @InjectMocks private BookingService bookingService;
 
     private UUID userId;

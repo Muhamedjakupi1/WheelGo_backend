@@ -22,6 +22,7 @@ public class VehicleImageAdminService {
     private final VehicleImageRepository vehicleImageRepository;
     private final VehicleRepository vehicleRepository;
     private final FileStorageService fileStorageService;
+    private final CacheInvalidationService cacheInvalidationService;
 
     @Transactional(readOnly = true)
     public List<VehicleImageResponse> getAll(UUID vehicleId) {
@@ -43,7 +44,9 @@ public class VehicleImageAdminService {
         }
         String storedUrl = fileStorageService.storeVehicleImage(file);
         Vehicle vehicle = findVehicle(vehicleId);
-        return toResponse(saveNewVehicleImageRow(vehicle, storedUrl, isPrimary));
+        VehicleImageResponse response = toResponse(saveNewVehicleImageRow(vehicle, storedUrl, isPrimary));
+        cacheInvalidationService.evictVehicle(vehicle.getId());
+        return response;
     }
 
     @Transactional
@@ -69,12 +72,17 @@ public class VehicleImageAdminService {
             }
         }
 
-        return toResponse(vehicleImageRepository.save(image));
+        VehicleImageResponse response = toResponse(vehicleImageRepository.save(image));
+        cacheInvalidationService.evictVehicle(image.getVehicle().getId());
+        return response;
     }
 
     @Transactional
     public void delete(UUID id) {
-        vehicleImageRepository.delete(findImage(id));
+        VehicleImage image = findImage(id);
+        UUID vehicleId = image.getVehicle() != null ? image.getVehicle().getId() : null;
+        vehicleImageRepository.delete(image);
+        cacheInvalidationService.evictVehicle(vehicleId);
     }
 
     private VehicleImage saveNewVehicleImageRow(Vehicle vehicle, String url, boolean isPrimary) {

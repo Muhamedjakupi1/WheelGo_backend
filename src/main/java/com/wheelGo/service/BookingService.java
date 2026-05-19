@@ -1,5 +1,6 @@
 package com.wheelGo.service;
 
+import com.wheelGo.config.CacheNames;
 import com.wheelGo.model.addon.Addon;
 import com.wheelGo.model.booking_addons.BookingAddon;
 import com.wheelGo.model.bookings.BookingAdminDecisionRequest;
@@ -27,6 +28,9 @@ import com.wheelGo.repository.VehicleImageRepository;
 import com.wheelGo.repository.VehicleRepository;
 import com.wheelGo.schema.TenantSchemaExecutor;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -72,6 +76,7 @@ public class BookingService {
     private final VehicleRepository vehicleRepository;
     private final VehicleImageRepository vehicleImageRepository;
     private final MaintenanceRecordRepository maintenanceRecordRepository;
+    private final CacheInvalidationService cacheInvalidationService;
 
     @Transactional
     public BookingResponse createBooking(UUID userId, BookingCreateRequest request) {
@@ -156,22 +161,30 @@ public class BookingService {
                         .map(VehicleImage::getUrl)
                         .orElse(null)
         );
+        cacheInvalidationService.evictBookings(userId);
+        cacheInvalidationService.evictVehicle(savedBooking.getVehicleId());
         return response;
     }
 
     @Transactional
+    @Cacheable(value = CacheNames.BOOKINGS, key = "'user:' + #userId")
     public List<BookingResponse> getBookingsForUser(UUID userId) {
         releaseFinishedAddonInventory();
         return toResponses(bookingRepository.findAllByUserIdOrderByCreatedAtDesc(userId));
     }
 
     @Transactional
+    @Cacheable(value = CacheNames.BOOKINGS, key = "'admin:all'")
     public List<BookingResponse> getBookingsForAdmin() {
         releaseFinishedAddonInventory();
         return toResponses(bookingRepository.findAllByOrderByCreatedAtDesc());
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = CacheNames.BOOKINGS, key = "'user:' + #result.userId"),
+            @CacheEvict(value = CacheNames.BOOKINGS, key = "'admin:all'")
+    })
     public BookingResponse confirmBooking(UUID bookingId, BookingAdminDecisionRequest request) {
         releaseFinishedAddonInventory();
         Booking booking = findBooking(bookingId);
@@ -196,10 +209,15 @@ public class BookingService {
         booking.setUpdatedAt(LocalDateTime.now());
         Booking savedBooking = bookingRepository.save(booking);
         syncVehicleStatus(savedBooking.getVehicleId());
+        cacheInvalidationService.evictVehicle(savedBooking.getVehicleId());
         return toResponseWithDetails(savedBooking);
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = CacheNames.BOOKINGS, key = "'user:' + #result.userId"),
+            @CacheEvict(value = CacheNames.BOOKINGS, key = "'admin:all'")
+    })
     public BookingResponse rejectBooking(UUID bookingId, BookingAdminDecisionRequest request) {
         releaseFinishedAddonInventory();
         Booking booking = findBooking(bookingId);
@@ -216,10 +234,15 @@ public class BookingService {
         booking.setUpdatedAt(LocalDateTime.now());
         Booking savedBooking = bookingRepository.save(booking);
         syncVehicleStatus(savedBooking.getVehicleId());
+        cacheInvalidationService.evictVehicle(savedBooking.getVehicleId());
         return toResponseWithDetails(savedBooking);
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = CacheNames.BOOKINGS, key = "'user:' + #result.userId"),
+            @CacheEvict(value = CacheNames.BOOKINGS, key = "'admin:all'")
+    })
     public BookingResponse updateBookingAsAdmin(UUID bookingId, BookingAdminUpdateRequest request) {
         releaseFinishedAddonInventory();
         Booking booking = findBooking(bookingId);
@@ -288,6 +311,7 @@ public class BookingService {
         booking.setUpdatedAt(LocalDateTime.now());
         Booking savedBooking = bookingRepository.save(booking);
         syncVehicleStatus(savedBooking.getVehicleId());
+        cacheInvalidationService.evictVehicle(savedBooking.getVehicleId());
         return toResponseWithDetails(savedBooking);
     }
 
@@ -299,8 +323,11 @@ public class BookingService {
             releaseBookingAddonInventory(booking);
         }
         UUID vehicleId = booking.getVehicleId();
+        UUID userId = booking.getUserId();
         bookingRepository.delete(booking);
         syncVehicleStatus(vehicleId);
+        cacheInvalidationService.evictBookings(userId);
+        cacheInvalidationService.evictVehicle(vehicleId);
     }
 
     private List<BookingResponse> toResponses(List<Booking> bookings) {
@@ -500,7 +527,15 @@ public class BookingService {
             finishedBookings.stream()
                     .map(Booking::getVehicleId)
                     .distinct()
-                    .forEach(this::syncVehicleStatus);
+                    .forEach(vehicleId -> {
+                        syncVehicleStatus(vehicleId);
+                        cacheInvalidationService.evictVehicle(vehicleId);
+                    });
+            finishedBookings.stream()
+                    .map(Booking::getUserId)
+                    .distinct()
+                    .forEach(cacheInvalidationService::evictBookingsForUser);
+            cacheInvalidationService.evictBookingsForAdmin();
         }
     }
 

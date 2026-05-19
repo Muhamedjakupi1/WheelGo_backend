@@ -46,10 +46,10 @@ class VehicleAdminServiceTest {
     @Mock private VehicleRepository vehicleRepository;
     @Mock private VehicleCategoryRepository vehicleCategoryRepository;
     @Mock private LocationRepository locationRepository;
-    @Mock private VehicleImageRepository vehicleImageRepository;
-    @Mock private BookingRepository bookingRepository;
-    @Mock private MaintenanceRecordRepository maintenanceRecordRepository;
-    @InjectMocks private VehicleAdminService vehicleAdminService;
+  	@Mock private VehicleImageRepository vehicleImageRepository;
+  	@Mock private BookingRepository bookingRepository;
+  	@Mock private MaintenanceRecordRepository maintenanceRecordRepository;
+  	@InjectMocks private VehicleAdminService vehicleAdminService;
 
     private UUID vehicleId;
     private Vehicle vehicle;

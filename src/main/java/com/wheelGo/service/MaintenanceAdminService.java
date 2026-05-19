@@ -34,6 +34,7 @@ public class MaintenanceAdminService {
     private final MaintenanceRecordRepository maintenanceRecordRepository;
     private final VehicleRepository vehicleRepository;
     private final BookingRepository bookingRepository;
+    private final CacheInvalidationService cacheInvalidationService;
 
     @Transactional(readOnly = true)
     public List<MaintenanceRecordResponse> getAll() {
@@ -63,6 +64,7 @@ public class MaintenanceAdminService {
 
         MaintenanceRecord saved = maintenanceRecordRepository.save(record);
         syncVehicleStatusAfterMaintenanceChange(vehicle.getId());
+        cacheInvalidationService.evictVehicle(vehicle.getId());
         return toResponse(saved);
     }
 
@@ -78,6 +80,8 @@ public class MaintenanceAdminService {
         MaintenanceRecord saved = maintenanceRecordRepository.save(record);
         syncVehicleStatusAfterMaintenanceChange(originalVehicleId);
         syncVehicleStatusAfterMaintenanceChange(saved.getVehicle().getId());
+        cacheInvalidationService.evictVehicle(originalVehicleId);
+        cacheInvalidationService.evictVehicle(saved.getVehicle().getId());
         return toResponse(saved);
     }
 
@@ -88,6 +92,7 @@ public class MaintenanceAdminService {
         maintenanceRecordRepository.delete(record);
         maintenanceRecordRepository.flush();
         syncVehicleStatusAfterMaintenanceChange(vehicleId);
+        cacheInvalidationService.evictVehicle(vehicleId);
     }
 
     private MaintenanceRecord findRecord(UUID id) {
