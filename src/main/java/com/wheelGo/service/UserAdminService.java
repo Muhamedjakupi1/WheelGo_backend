@@ -4,6 +4,9 @@ import com.wheelGo.model.enums.Role;
 import com.wheelGo.model.user.User;
 import com.wheelGo.model.user.UserResponse;
 import com.wheelGo.model.user.UserUpdateRequest;
+import com.wheelGo.model.vehicle_images.VehicleImage;
+import com.wheelGo.model.vehicles.Vehicle;
+import com.wheelGo.model.vehicles.VehicleResponse;
 import com.wheelGo.repository.UserRepository;
 import com.wheelGo.security.CustomUserPrincipal;
 import lombok.RequiredArgsConstructor;
@@ -15,8 +18,11 @@ import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.persistence.EntityManager;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,7 +36,7 @@ public class UserAdminService {
     @Transactional(readOnly = true)
     public List<UserResponse> getAll() {
         UUID tenantId = adminAccessService.requireCurrentTenantId();
-        return userRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId)
+        return userRepository.findAllByTenantIdAndRoleOrderByCreatedAtDesc(tenantId, Role.USER)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -169,4 +175,20 @@ public class UserAdminService {
         response.setCreatedAt(user.getCreatedAt());
         return response;
     }
+
+    private List<UserResponse> toResponses(List<User> users) {
+        if (users == null) {
+            return Collections.emptyList();
+        }
+        return users.stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<UserResponse> searchUser(String keyword) {
+        UUID tenantId = adminAccessService.requireCurrentTenantId();
+        List<User> users = userRepository.searchUser(tenantId, Role.USER, keyword.trim());
+        return toResponses(users);
+    }
+
 }
