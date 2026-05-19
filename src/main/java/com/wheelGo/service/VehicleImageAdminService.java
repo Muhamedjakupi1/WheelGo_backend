@@ -3,9 +3,11 @@ package com.wheelGo.service;
 import com.wheelGo.model.vehicle_images.VehicleImage;
 import com.wheelGo.model.vehicle_images.VehicleImageResponse;
 import com.wheelGo.model.vehicles.Vehicle;
+import com.wheelGo.model.vehicles.VehicleResponse;
 import com.wheelGo.repository.VehicleImageRepository;
 import com.wheelGo.repository.VehicleRepository;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,7 +27,15 @@ public class VehicleImageAdminService {
 
     @Transactional(readOnly = true)
     public List<VehicleImageResponse> getAll(UUID vehicleId) {
-        List<VehicleImage> images = vehicleId != null
+        return getAll(vehicleId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<VehicleImageResponse> getAll(UUID vehicleId, String keyword) {
+        String normalizedKeyword = keyword == null ? null : keyword.trim();
+        List<VehicleImage> images = normalizedKeyword != null && !normalizedKeyword.isEmpty()
+                ? vehicleImageRepository.searchVehicleImages(vehicleId, normalizedKeyword)
+                : vehicleId != null
                 ? vehicleImageRepository.findByVehicleIdOrderByUploadedAtDesc(vehicleId)
                 : vehicleImageRepository.findAllByOrderByUploadedAtDesc();
         return images.stream().map(this::toResponse).toList();
