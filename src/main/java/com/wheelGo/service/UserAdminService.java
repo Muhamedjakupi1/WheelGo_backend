@@ -8,6 +8,11 @@ import com.wheelGo.repository.UserRepository;
 import com.wheelGo.security.CustomUserPrincipal;
 import com.wheelGo.validation.PasswordPolicy;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -27,8 +32,10 @@ public class UserAdminService {
     private final PasswordEncoder passwordEncoder;
     private final AdminAccessService adminAccessService;
     private final EntityManager entityManager;
+    private final CacheManager cacheManager;
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "users", key = "'all:' + @adminAccessService.requireCurrentTenantId()")
     public List<UserResponse> getAll() {
         UUID tenantId = adminAccessService.requireCurrentTenantId();
         return userRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId)
@@ -38,12 +45,21 @@ public class UserAdminService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "users", key = "#id")
     public UserResponse getById(UUID id) {
         UUID tenantId = adminAccessService.requireCurrentTenantId();
         return toResponse(findUser(id, tenantId));
     }
 
     @Transactional
+    @Caching(
+            put = {
+                    @CachePut(value = "users", key = "#result.id()")
+            },
+            evict = {
+                    @CacheEvict(value = "users", key = "'all:' + @adminAccessService.requireCurrentTenantId()")
+            }
+    )
     public UserResponse update(UUID id, UserUpdateRequest request) {
         UUID tenantId = adminAccessService.requireCurrentTenantId();
         CustomUserPrincipal principal = adminAccessService.requireCurrentPrincipal();
@@ -80,6 +96,10 @@ public class UserAdminService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "users", key = "#id"),
+            @CacheEvict(value = "users", key = "'all:' + @adminAccessService.requireCurrentTenantId()")
+    })
     public void delete(UUID id) {
         UUID tenantId = adminAccessService.requireCurrentTenantId();
         CustomUserPrincipal principal = adminAccessService.requireCurrentPrincipal();
