@@ -80,6 +80,18 @@ public class PaymentService {
     }
 
     @Transactional(readOnly = true)
+    public List<PaymentResponse> getPaymentsForUser(UUID userId, String keyword) {
+        String normalizedKeyword = normalizeKeyword(keyword);
+        if (normalizedKeyword == null) {
+            return getPaymentsForUser(userId);
+        }
+
+        return paymentRepository.searchPaymentsForUser(userId, normalizedKeyword).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public PaymentResponse getLatestPaymentForBooking(UUID userId, UUID bookingId) {
         getUserBooking(userId, bookingId);
         Payment payment = paymentRepository.findTopByBookingIdOrderByCreatedAtDesc(bookingId)
@@ -91,6 +103,18 @@ public class PaymentService {
     @Transactional(readOnly = true)
     public List<PaymentResponse> getPaymentsForAdmin() {
         return paymentRepository.findAllByOrderByCreatedAtDesc().stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaymentResponse> getPaymentsForAdmin(String keyword) {
+        String normalizedKeyword = normalizeKeyword(keyword);
+        if (normalizedKeyword == null) {
+            return getPaymentsForAdmin();
+        }
+
+        return paymentRepository.searchPaymentsForAdmin(normalizedKeyword).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -141,6 +165,15 @@ public class PaymentService {
     private Payment getPayment(UUID id) {
         return paymentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment not found"));
+    }
+
+    private String normalizeKeyword(String keyword) {
+        if (keyword == null) {
+            return null;
+        }
+
+        String trimmed = keyword.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private Booking getUserBooking(UUID userId, UUID bookingId) {
