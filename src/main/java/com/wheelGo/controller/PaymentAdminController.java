@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -22,8 +23,9 @@ public class PaymentAdminController {
     private final PaymentService paymentService;
 
     @GetMapping
-    public ResponseEntity<List<PaymentResponse>> getAll() {
-        return ResponseEntity.ok(paymentService.getPaymentsForAdmin());
+    public ResponseEntity<List<PaymentResponse>> getAll(
+            @RequestParam(value = "keyword", required = false) String keyword) {
+        return ResponseEntity.ok(paymentService.getPaymentsForAdmin(keyword));
     }
 
     @PatchMapping("/{id}/confirm")

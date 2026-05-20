@@ -45,6 +45,17 @@ public class MaintenanceAdminService {
     }
 
     @Transactional(readOnly = true)
+    public List<MaintenanceRecordResponse> getAll(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return getAll();
+        }
+        return maintenanceRecordRepository.searchMaintenanceRecords(keyword.trim())
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public MaintenanceRecordResponse getById(UUID id) {
         return toResponse(findRecord(id));
     }
