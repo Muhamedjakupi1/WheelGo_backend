@@ -38,6 +38,9 @@ public class BookingController {
     public ResponseEntity<List<BookingResponse>> getMyBookings(
             @RequestParam(value = "keyword", required = false) String keyword) {
         UUID userId = SecurityUtils.getCurrentUserId();
-        return ResponseEntity.ok(bookingService.getBookingsForUser(userId, keyword));
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return ResponseEntity.ok(bookingService.getBookingsForUser(userId));
+        }
+        return ResponseEntity.ok(bookingService.getBookingsForUser(userId,keyword));
     }
 }
