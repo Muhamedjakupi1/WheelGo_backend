@@ -32,9 +32,9 @@ import com.wheelGo.repository.VehicleImageRepository;
 import com.wheelGo.repository.VehicleRepository;
 import com.wheelGo.schema.TenantSchemaExecutor;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -168,9 +168,11 @@ public class BookingService {
                         .orElse(null)
         );
         cacheInvalidationService.evictBookings(userId);
+        cacheInvalidationService.evictBookingsForAdmin(); // Pastron listën e përgjithshme të adminit
         cacheInvalidationService.evictVehicle(savedBooking.getVehicleId());
         return response;
     }
+
 
     @Transactional
     @Cacheable(value = CacheNames.BOOKINGS, key = "'user:' + #userId")
@@ -180,10 +182,69 @@ public class BookingService {
     }
 
     @Transactional
+    public List<BookingResponse> getBookingsForUser(UUID userId, String keyword) {
+        List<BookingResponse> allBookings = getBookingsForUser(userId);
+
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return allBookings;
+        }
+
+        String lowerKeyword = keyword.trim().toLowerCase();
+
+        return allBookings.stream()
+                .filter(b -> {
+                    boolean matchesVehicle = b.getVehicleName() != null && b.getVehicleName().toLowerCase().contains(lowerKeyword);
+                    boolean matchesLocation = b.getLocationName() != null && b.getLocationName().toLowerCase().contains(lowerKeyword);
+                    boolean matchesStatus = b.getStatus() != null && b.getStatus().name().toLowerCase().contains(lowerKeyword);
+                    boolean matchesNotes = b.getNotes() != null && b.getNotes().toLowerCase().contains(lowerKeyword);
+
+
+                    Vehicle vehicle = vehicleRepository.findById(b.getVehicleId()).orElse(null);
+                    boolean matchesTransmission = false;
+                    if (vehicle != null && vehicle.getTransmission() != null) {
+                        matchesTransmission = vehicle.getTransmission().name().toLowerCase().contains(lowerKeyword);
+                    }
+
+                    return matchesVehicle || matchesLocation || matchesStatus || matchesNotes || matchesTransmission;
+                })
+                .toList();
+    }
+
+
+    @Transactional
     @Cacheable(value = CacheNames.BOOKINGS, key = "'admin:all'")
     public List<BookingResponse> getBookingsForAdmin() {
         releaseFinishedAddonInventory();
         return toResponses(bookingRepository.findAllByOrderByCreatedAtDesc());
+    }
+
+    @Transactional
+    public List<BookingResponse> getBookingsForAdmin(String keyword) {
+        List<BookingResponse> allBookings = getBookingsForAdmin();
+
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return allBookings;
+        }
+
+        String lowerKeyword = keyword.trim().toLowerCase();
+
+        return allBookings.stream()
+                .filter(b -> {
+                    boolean matchesVehicle = b.getVehicleName() != null && b.getVehicleName().toLowerCase().contains(lowerKeyword);
+                    boolean matchesEmail = b.getCustomerEmail() != null && b.getCustomerEmail().toLowerCase().contains(lowerKeyword);
+                    boolean matchesLocation = b.getLocationName() != null && b.getLocationName().toLowerCase().contains(lowerKeyword);
+                    boolean matchesStatus = b.getStatus() != null && b.getStatus().name().toLowerCase().contains(lowerKeyword);
+                    boolean matchesNotes = b.getNotes() != null && b.getNotes().toLowerCase().contains(lowerKeyword);
+
+                    Vehicle vehicle = vehicleRepository.findById(b.getVehicleId()).orElse(null);
+                    boolean matchesTransmission = false;
+                    if (vehicle != null && vehicle.getTransmission() != null) {
+                        matchesTransmission = vehicle.getTransmission().name().toLowerCase().contains(lowerKeyword);
+                    }
+
+                    return matchesVehicle || matchesEmail || matchesLocation || matchesStatus || matchesNotes || matchesTransmission;
+                })
+                .toList();
     }
 
     @Transactional
@@ -308,6 +369,7 @@ public class BookingService {
         bookingRepository.delete(booking);
         syncVehicleStatus(vehicleId);
         cacheInvalidationService.evictBookings(userId);
+        cacheInvalidationService.evictBookingsForAdmin();
         cacheInvalidationService.evictVehicle(vehicleId);
     }
 
@@ -373,11 +435,11 @@ public class BookingService {
                     List<BookingAddon> bookingAddons = addonsByBookingId.getOrDefault(booking.getId(), List.of());
                     List<String> addonNames = bookingAddons.stream()
                             .map(bookingAddon -> formatAddonName(bookingAddon, addonById.get(bookingAddon.getAddonId())))
-                            .filter(java.util.Objects::nonNull)
+                            .filter(Objects::nonNull)
                             .toList();
                     boolean babySeatRequested = bookingAddons.stream()
                             .map(bookingAddon -> addonById.get(bookingAddon.getAddonId()))
-                            .filter(java.util.Objects::nonNull)
+                            .filter(Objects::nonNull)
                             .anyMatch(addon -> BABY_SEAT_NAME.equalsIgnoreCase(addon.getName()));
 
                     BookingResponse response = toResponse(booking, vehicle, bookingAddons, babySeatRequested);
@@ -834,9 +896,6 @@ public class BookingService {
                 .toList();
     }
 
-    private record SelectedAddon(Addon addon, int quantity) {
-    }
-
-    private record MaintenanceAvailability(boolean active, LocalDate availableFrom) {
-    }
+    private record MaintenanceAvailability(boolean active, LocalDate availableFrom) {}
+    private record SelectedAddon(Addon addon, int quantity) {}
 }

@@ -30,6 +30,9 @@ public class BookingAdminController {
     @GetMapping
     public ResponseEntity<List<BookingResponse>> getAll(
             @RequestParam(value = "keyword", required = false) String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return ResponseEntity.ok(bookingService.getBookingsForAdmin());
+        }
         return ResponseEntity.ok(bookingService.getBookingsForAdmin(keyword));
     }
 

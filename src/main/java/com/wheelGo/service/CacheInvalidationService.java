@@ -14,22 +14,39 @@ public class CacheInvalidationService {
 
     private final CacheManager cacheManager;
 
+    /**
+     * Fshin saktësisht vetëm cache-in e rezervimeve të atij përdoruesi.
+     */
     public void evictBookings(UUID userId) {
-        Cache cache = requireCache(CacheNames.BOOKINGS);
         if (userId != null) {
+            Cache cache = requireCache(CacheNames.BOOKINGS);
+            // Fshin saktësisht çelësin "user:UUID" brenda "bookings_v1"
             cache.evict("user:" + userId);
         }
-        cache.evict("admin:all");
     }
 
     public void evictBookingsForUser(UUID userId) {
-        requireCache(CacheNames.BOOKINGS).evict("user:" + userId);
+        evictBookings(userId);
     }
 
+    /**
+     * Nëse admini shikon një listë të përgjithshme (psh. "bookings_v1::all")
+     */
     public void evictBookingsForAdmin() {
-        requireCache(CacheNames.BOOKINGS).evict("admin:all");
+        Cache cache = requireCache(CacheNames.BOOKINGS);
+        cache.evict("all");
     }
 
+    /**
+     * Nëse dëshiron t'i fshish KREJT rezervimet e të gjithë përdoruesve me një herë
+     */
+    public void clearAllBookings() {
+        requireCache(CacheNames.BOOKINGS).clear();
+    }
+
+    /**
+     * Fshin një automjet specifik dhe listën e përgjithshme të automjeteve.
+     */
     public void evictVehicle(UUID vehicleId) {
         Cache cache = requireCache(CacheNames.VEHICLES);
         if (vehicleId != null) {
@@ -41,7 +58,7 @@ public class CacheInvalidationService {
     private Cache requireCache(String cacheName) {
         Cache cache = cacheManager.getCache(cacheName);
         if (cache == null) {
-            throw new IllegalStateException("Cache '" + cacheName + "' not found");
+            throw new IllegalStateException("Cache '" + cacheName + "' nuk u gjet në Redis");
         }
         return cache;
     }

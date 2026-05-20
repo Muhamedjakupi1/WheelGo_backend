@@ -337,6 +337,8 @@ public class VehicleAdminService {
     public List<VehicleResponse> searchVehicle(String keyword) {
         List<Vehicle> vehicles = vehicleRepository.searchVehicle(keyword.trim());
         return toResponses(vehicles);
+
+    }
     private record MaintenanceAvailability(boolean active, java.time.LocalDate availableFrom) {
     }
 }
