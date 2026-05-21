@@ -9,13 +9,17 @@ import com.wheelGo.model.user_profiles.UserProfileResponse;
 import com.wheelGo.model.user_profiles.UserProfileUpdateRequest;
 import com.wheelGo.repository.UserProfileRepository;
 import com.wheelGo.repository.UserRepository;
+import com.wheelGo.security.CustomUserPrincipal;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
@@ -59,6 +63,27 @@ class UserProfileServiceTest {
         response = new UserProfileResponse();
         response.setId(profile.getId());
         response.setFirstName("John");
+
+        CustomUserPrincipal principal = new CustomUserPrincipal(
+                userId,
+                "user@example.com",
+                "hash",
+                "v1",
+                "USER",
+                tenant.getId(),
+                "tenant",
+                false,
+                null,
+                null
+        );
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities())
+        );
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -67,7 +92,7 @@ class UserProfileServiceTest {
         request.setFirstName("John");
         request.setLastName("Doe");
 
-        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(userRepository.findByIdAndTenantId(userId, user.getTenant().getId())).thenReturn(Optional.of(user));
         when(userProfileRepository.findByUser_Id(userId)).thenReturn(Optional.empty());
         when(userProfileRepository.save(any(UserProfile.class))).thenReturn(profile);
         when(userProfileMapper.toResponse(profile)).thenReturn(response);
@@ -79,7 +104,7 @@ class UserProfileServiceTest {
 
     @Test
     void should_throw_not_found_when_creating_profile_for_missing_user() {
-        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+        when(userRepository.findByIdAndTenantId(userId, user.getTenant().getId())).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> userProfileService.createProfile(userId, new UserProfileRequest()))
                 .isInstanceOf(ResponseStatusException.class)
@@ -88,7 +113,7 @@ class UserProfileServiceTest {
 
     @Test
     void should_throw_bad_request_when_profile_already_exists() {
-        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(userRepository.findByIdAndTenantId(userId, user.getTenant().getId())).thenReturn(Optional.of(user));
         when(userProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(profile));
 
         assertThatThrownBy(() -> userProfileService.createProfile(userId, new UserProfileRequest()))
@@ -109,7 +134,7 @@ class UserProfileServiceTest {
     @Test
     void should_create_default_profile_when_get_profile_by_user_id_missing() {
         when(userProfileRepository.findByUser_Id(userId)).thenReturn(Optional.empty());
-        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(userRepository.findByIdAndTenantId(userId, user.getTenant().getId())).thenReturn(Optional.of(user));
         when(userProfileRepository.save(any(UserProfile.class))).thenReturn(profile);
         when(userProfileMapper.toResponse(profile)).thenReturn(response);
 

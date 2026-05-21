@@ -1,5 +1,6 @@
 package com.wheelGo.controller;
 
+import com.wheelGo.controller.support.SecuredControllerTestConfig;
 import com.wheelGo.model.tenant.Tenant;
 import com.wheelGo.repository.TenantRepository;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(useDefaultFilters = false)
-@Import(PublicTenantController.class)
+@Import({PublicTenantController.class, SecuredControllerTestConfig.class})
 class PublicTenantControllerTest {
 
     @Autowired

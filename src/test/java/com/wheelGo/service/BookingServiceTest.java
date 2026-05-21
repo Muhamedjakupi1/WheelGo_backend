@@ -4,6 +4,7 @@ import com.wheelGo.model.bookings.Booking;
 import com.wheelGo.model.bookings.BookingAdminDecisionRequest;
 import com.wheelGo.model.bookings.BookingCreateRequest;
 import com.wheelGo.model.bookings.BookingResponse;
+import com.wheelGo.model.driver_licenses.DriverLicense;
 import com.wheelGo.model.enums.BookingStatus;
 import com.wheelGo.model.enums.VehicleStatus;
 import com.wheelGo.model.maintenance_records.MaintenanceRecord;
@@ -13,7 +14,10 @@ import com.wheelGo.model.vehicles.Vehicle;
 import com.wheelGo.repository.AddonRepository;
 import com.wheelGo.repository.BookingAddonRepository;
 import com.wheelGo.repository.BookingRepository;
+import com.wheelGo.repository.DriverLicenseRepository;
+import com.wheelGo.repository.InvoiceRepository;
 import com.wheelGo.repository.MaintenanceRecordRepository;
+import com.wheelGo.repository.PaymentRepository;
 import com.wheelGo.repository.TenantRepository;
 import com.wheelGo.repository.UserRepository;
 import com.wheelGo.repository.VehicleImageRepository;
@@ -53,12 +57,16 @@ class BookingServiceTest {
     @Mock private VehicleImageRepository vehicleImageRepository;
     @Mock private MaintenanceRecordRepository maintenanceRecordRepository;
     @Mock private CacheInvalidationService cacheInvalidationService;
+    @Mock private PaymentRepository paymentRepository;
+    @Mock private InvoiceRepository invoiceRepository;
+    @Mock private DriverLicenseRepository driverLicenseRepository;
     @InjectMocks private BookingService bookingService;
 
     private UUID userId;
     private UUID vehicleId;
     private User user;
     private Vehicle vehicle;
+    private DriverLicense verifiedLicense;
 
     @BeforeEach
     void setUp() {
@@ -66,6 +74,10 @@ class BookingServiceTest {
         vehicleId = UUID.randomUUID();
         user = new User();
         user.setId(userId);
+        verifiedLicense = new DriverLicense();
+        verifiedLicense.setUser(user);
+        verifiedLicense.setVerified(true);
+        verifiedLicense.setExpiryDate(LocalDate.now().plusYears(1));
         Location location = new Location();
         location.setId(UUID.randomUUID());
         location.setName("Pristina");
@@ -93,15 +105,16 @@ class BookingServiceTest {
         saved.setDropoffLocationId(vehicle.getLocation().getId());
         saved.setStartDate(request.getStartDate().atStartOfDay());
         saved.setEndDate(request.getEndDate().atTime(java.time.LocalTime.MAX));
-        saved.setTotalDays(2);
-        saved.setBasePrice(new BigDecimal("200.00"));
+        saved.setTotalDays(3);
+        saved.setBasePrice(new BigDecimal("300.00"));
         saved.setDiscountAmount(BigDecimal.ZERO);
         saved.setAddonPrice(BigDecimal.ZERO);
-        saved.setTotalPrice(new BigDecimal("200.00"));
+        saved.setTotalPrice(new BigDecimal("300.00"));
         saved.setStatus(BookingStatus.PENDING);
 
         when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(driverLicenseRepository.findByUser_Id(userId)).thenReturn(Optional.of(verifiedLicense));
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
         when(maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicleId)).thenReturn(List.of());
         when(bookingRepository.findAllByVehicleIdAndStatusInAndStartDateLessThanAndEndDateGreaterThanOrderByEndDateAsc(any(), any(), any(), any())).thenReturn(List.of());
@@ -122,6 +135,7 @@ class BookingServiceTest {
 
         when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(driverLicenseRepository.findByUser_Id(userId)).thenReturn(Optional.of(verifiedLicense));
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
 
         assertThatThrownBy(() -> bookingService.createBooking(userId, request))
@@ -137,6 +151,7 @@ class BookingServiceTest {
 
         when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(driverLicenseRepository.findByUser_Id(userId)).thenReturn(Optional.of(verifiedLicense));
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
 
         assertThatThrownBy(() -> bookingService.createBooking(userId, request))
@@ -156,6 +171,7 @@ class BookingServiceTest {
 
         when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(driverLicenseRepository.findByUser_Id(userId)).thenReturn(Optional.of(verifiedLicense));
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
         when(maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicleId))
                 .thenReturn(List.of(maintenanceRecord));
@@ -183,15 +199,16 @@ class BookingServiceTest {
         saved.setDropoffLocationId(vehicle.getLocation().getId());
         saved.setStartDate(request.getStartDate().atStartOfDay());
         saved.setEndDate(request.getEndDate().atTime(java.time.LocalTime.MAX));
-        saved.setTotalDays(2);
-        saved.setBasePrice(new BigDecimal("200.00"));
+        saved.setTotalDays(3);
+        saved.setBasePrice(new BigDecimal("300.00"));
         saved.setDiscountAmount(BigDecimal.ZERO);
         saved.setAddonPrice(BigDecimal.ZERO);
-        saved.setTotalPrice(new BigDecimal("200.00"));
+        saved.setTotalPrice(new BigDecimal("300.00"));
         saved.setStatus(BookingStatus.PENDING);
 
         when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(driverLicenseRepository.findByUser_Id(userId)).thenReturn(Optional.of(verifiedLicense));
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
         when(maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicleId))
                 .thenReturn(List.of(maintenanceRecord));
@@ -217,6 +234,7 @@ class BookingServiceTest {
 
         when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(driverLicenseRepository.findByUser_Id(userId)).thenReturn(Optional.of(verifiedLicense));
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
         when(maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicleId)).thenReturn(List.of());
         when(bookingRepository.findAllByVehicleIdAndStatusInAndStartDateLessThanAndEndDateGreaterThanOrderByEndDateAsc(any(), any(), any(), any())).thenReturn(List.of(conflict));
