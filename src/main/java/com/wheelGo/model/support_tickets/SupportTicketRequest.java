@@ -18,5 +18,8 @@ public class SupportTicketRequest {
     private String subject;
 
     private TicketPriority priority;
+
+    @NotBlank(message = "Message is required")
+    private String message;
 }
 

@@ -13,9 +13,11 @@ public class SupportTicketResponse {
     private UUID id;
     private UUID userId;
     private UUID bookingId;
+    private String customerEmail;
     private String subject;
     private TicketStatus status;
     private TicketPriority priority;
+    private String lastMessage;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
