@@ -21,11 +21,15 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.regex.Pattern;
+
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.FORBIDDEN;
 
 @Service
 @AllArgsConstructor
 public class AuthService {
+    private static final Pattern PHONE_ALLOWED_CHARS = Pattern.compile("^[0-9+()\\-\\s]+$");
 
     private final UserRepository userRepository;
     private final TenantRepository tenantRepository;
@@ -34,6 +38,7 @@ public class AuthService {
     private final AuditLogService auditLogService;
     private final UserProfileRepository userProfileRepository;
     private final TenantSchemaExecutor tenantSchemaExecutor;
+    private final CacheInvalidationService cacheInvalidationService;
 
 
     public AuthResponse login(AuthLoginRequest req) {
@@ -95,7 +100,7 @@ public class AuthService {
         String email = required(req.email(), "Email").toLowerCase();
         String firstName = required(req.firstName(), "First name");
         String lastName = required(req.lastName(), "Last name");
-        String phone = required(req.phone(), "Phone number");
+        String phone = validatePhoneNumber(req.phone());
 
         Tenant tenant = tenantRepository.findBySlug(req.tenantSlug())
                 .orElseThrow(() -> new RuntimeException("Tenant not found"));
@@ -130,6 +135,8 @@ public class AuthService {
             profile.setPhone(phone);
             userProfileRepository.save(profile);
         });
+
+        cacheInvalidationService.evictUsersForTenant(tenant.getId());
 
         auditLogService.logForSchema(tenant.getSchemaName(), saved.getId(), AuditAction.CREATE, "User", saved.getId(), null, saved);
 
@@ -166,5 +173,19 @@ public class AuthService {
             throw new RuntimeException(fieldName + " is required");
         }
         return value.trim();
+    }
+
+    private String validatePhoneNumber(String value) {
+        String phone = required(value, "Phone number");
+        if (!PHONE_ALLOWED_CHARS.matcher(phone).matches()) {
+            throw new ResponseStatusException(BAD_REQUEST, "Phone number can contain only digits, spaces, '+', '-', and parentheses");
+        }
+
+        long digitCount = phone.chars().filter(Character::isDigit).count();
+        if (digitCount < 6 || digitCount > 15) {
+            throw new ResponseStatusException(BAD_REQUEST, "Phone number must contain between 6 and 15 digits");
+        }
+
+        return phone;
     }
 }

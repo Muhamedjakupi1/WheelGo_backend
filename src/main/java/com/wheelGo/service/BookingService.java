@@ -9,6 +9,7 @@ import com.wheelGo.model.bookings.Booking;
 import com.wheelGo.model.bookings.BookingCreateRequest;
 import com.wheelGo.model.bookings.BookingResponse;
 import com.wheelGo.model.bookings.BookingSelectedAddonRequest;
+import com.wheelGo.model.driver_licenses.DriverLicense;
 import com.wheelGo.model.enums.AddonType;
 import com.wheelGo.model.enums.BookingStatus;
 import com.wheelGo.model.enums.VehicleStatus;
@@ -93,14 +94,7 @@ public class BookingService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
-        if (driverLicenseRepository.findByUser_Id(userId)
-                .filter(license -> license.getVerifiedAt() != null)
-                .isEmpty()) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "You need a verified driver license before booking. Go to your profile and upload your driver license."
-            );
-        }
+        validateDriverLicenseEligibility(userId);
 
         Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vehicle not found"));
@@ -223,7 +217,7 @@ public class BookingService {
 
 
     @Transactional
-    @Cacheable(value = CacheNames.BOOKINGS, key = "'admin:all'")
+    @Cacheable(value = CacheNames.BOOKINGS, key = "'admin:all:' + @tenantCacheKeyService.currentTenantScope()")
     public List<BookingResponse> getBookingsForAdmin() {
         releaseFinishedAddonInventory();
         return toResponses(bookingRepository.findAllByOrderByCreatedAtDesc());
@@ -261,7 +255,7 @@ public class BookingService {
     @Transactional
     @Caching(evict = {
             @CacheEvict(value = CacheNames.BOOKINGS, key = "'user:' + #result.userId"),
-            @CacheEvict(value = CacheNames.BOOKINGS, key = "'admin:all'")
+            @CacheEvict(value = CacheNames.BOOKINGS, key = "'admin:all:' + @tenantCacheKeyService.currentTenantScope()")
     })
     public BookingResponse confirmBooking(UUID bookingId, BookingAdminDecisionRequest request) {
         releaseFinishedAddonInventory();
@@ -294,7 +288,7 @@ public class BookingService {
     @Transactional
     @Caching(evict = {
             @CacheEvict(value = CacheNames.BOOKINGS, key = "'user:' + #result.userId"),
-            @CacheEvict(value = CacheNames.BOOKINGS, key = "'admin:all'")
+            @CacheEvict(value = CacheNames.BOOKINGS, key = "'admin:all:' + @tenantCacheKeyService.currentTenantScope()")
     })
     public BookingResponse rejectBooking(UUID bookingId, BookingAdminDecisionRequest request) {
         releaseFinishedAddonInventory();
@@ -319,7 +313,7 @@ public class BookingService {
     @Transactional
     @Caching(evict = {
             @CacheEvict(value = CacheNames.BOOKINGS, key = "'user:' + #result.userId"),
-            @CacheEvict(value = CacheNames.BOOKINGS, key = "'admin:all'")
+            @CacheEvict(value = CacheNames.BOOKINGS, key = "'admin:all:' + @tenantCacheKeyService.currentTenantScope()")
     })
     public BookingResponse updateBookingAsAdmin(UUID bookingId, BookingAdminUpdateRequest request) {
         releaseFinishedAddonInventory();
@@ -832,6 +826,35 @@ public class BookingService {
 
     private String readLocationName(Location location) {
         return location != null ? location.getName() : null;
+    }
+
+    private void validateDriverLicenseEligibility(UUID userId) {
+        DriverLicense license = driverLicenseRepository.findByUser_Id(userId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        "You need to upload and verify your driver license before booking."
+                ));
+
+        if (!license.isVerified()) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Your driver license is not verified yet. Complete AI verification before booking."
+            );
+        }
+
+        if (license.getExpiryDate() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Your driver license expiry date is missing. Update your driver license before booking."
+            );
+        }
+
+        if (license.getExpiryDate().isBefore(LocalDate.now())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Your driver license is expired. Update your driver license before booking."
+            );
+        }
     }
 
     private String normalizeOptionalText(String value) {
