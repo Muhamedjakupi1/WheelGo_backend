@@ -69,6 +69,15 @@ public class Booking {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    @Column(name = "review_eligible", nullable = false)
+    private Boolean reviewEligible = false;
+
+    @Column(name = "review_eligible_at")
+    private LocalDateTime reviewEligibleAt;
+
+    @Column(name = "review_submitted_at")
+    private LocalDateTime reviewSubmittedAt;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
