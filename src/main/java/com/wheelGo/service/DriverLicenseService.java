@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -27,7 +28,7 @@ public class DriverLicenseService {
     private final FileStorageService fileStorageService;
     private final OllamaDriverLicenseVerificationService ollamaDriverLicenseVerificationService;
 
-    @Transactional
+    @Transactional(readOnly = true)
     public DriverLicenseResponse getMyLicense(UUID userId) {
         User user = findCurrentUser(userId);
         DriverLicense license = driverLicenseRepository.findByUser_Id(userId).orElse(null);
@@ -51,7 +52,7 @@ public class DriverLicenseService {
         }
 
         license.setUpdatedAt(LocalDateTime.now());
-        license.setVerifiedAt(null);
+        clearVerificationState(license);
         DriverLicense saved = driverLicenseRepository.save(license);
         return toResponse(saved, userId);
     }
@@ -95,7 +96,7 @@ public class DriverLicenseService {
         }
 
         license.setUpdatedAt(LocalDateTime.now());
-        license.setVerifiedAt(null);
+        clearVerificationState(license);
         driverLicenseRepository.save(license);
 
         DriverLicenseVerificationResponse response = ollamaDriverLicenseVerificationService.verify(
@@ -103,8 +104,7 @@ public class DriverLicenseService {
                 fileStorageService.resolveStoredUpload(license.getBackImageUrl())
         );
 
-        license.setUpdatedAt(LocalDateTime.now());
-        license.setVerifiedAt(response.isVerified() ? LocalDateTime.now() : null);
+        applyVerificationResult(license, response.isVerified());
         DriverLicense saved = driverLicenseRepository.save(license);
 
         response.setLicense(toResponse(saved, userId));
@@ -134,7 +134,7 @@ public class DriverLicenseService {
             license.setBackImageUrl(storedUrl);
         }
         license.setUpdatedAt(LocalDateTime.now());
-        license.setVerifiedAt(null);
+        clearVerificationState(license);
 
         DriverLicense saved = driverLicenseRepository.save(license);
         return toResponse(saved, userId);
@@ -145,8 +145,21 @@ public class DriverLicenseService {
         license.setUser(user);
         license.setLicenseNumber("PENDING");
         license.setIssuingCountry("PENDING");
-        license.setExpiryDate(java.time.LocalDate.of(2099, 1, 1));
+        license.setExpiryDate(LocalDate.of(2099, 1, 1));
+        license.setVerified(false);
+        license.setVerifiedAt(null);
         return driverLicenseRepository.save(license);
+    }
+
+    private void applyVerificationResult(DriverLicense license, boolean verified) {
+        license.setVerified(verified);
+        license.setVerifiedAt(verified ? LocalDateTime.now() : null);
+        license.setUpdatedAt(LocalDateTime.now());
+    }
+
+    private void clearVerificationState(DriverLicense license) {
+        license.setVerified(false);
+        license.setVerifiedAt(null);
     }
 
     private User findCurrentUser(UUID userId) {
@@ -186,11 +199,11 @@ public class DriverLicenseService {
         response.setFrontImageUrl(license.getFrontImageUrl());
         response.setBackImageUrl(license.getBackImageUrl());
         response.setVerifiedAt(license.getVerifiedAt());
-        response.setVerified(license.getVerifiedAt() != null);
+        response.setVerified(license.isVerified());
         return response;
     }
 
     private boolean isPendingExpiryDate(java.time.LocalDate expiryDate) {
-        return expiryDate == null || java.time.LocalDate.of(2099, 1, 1).equals(expiryDate);
+        return expiryDate == null || LocalDate.of(2099, 1, 1).equals(expiryDate);
     }
 }

@@ -8,6 +8,7 @@ import com.wheelGo.model.user_profiles.UserProfileResponse;
 import com.wheelGo.model.user_profiles.UserProfileUpdateRequest;
 import com.wheelGo.repository.UserProfileRepository;
 import com.wheelGo.repository.UserRepository;
+import com.wheelGo.tools.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -28,8 +29,7 @@ public class UserProfileService {
 
     @Transactional
     public UserProfileResponse createProfile(UUID userId, UserProfileRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        User user = findCurrentUser(userId);
 
         if (userProfileRepository.findByUser_Id(userId).isPresent()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User profile already exists");
@@ -116,8 +116,7 @@ public class UserProfileService {
     }
 
     private UserProfile createDefaultProfile(UUID userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        User user = findCurrentUser(userId);
 
         UserProfile profile = new UserProfile();
         profile.setUser(user);
@@ -125,6 +124,16 @@ public class UserProfileService {
         profile.setLastName("User");
 
         return userProfileRepository.save(profile);
+    }
+
+    private User findCurrentUser(UUID userId) {
+        UUID tenantId = SecurityUtils.getCurrentTenantId();
+        if (tenantId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "No authenticated tenant context found");
+        }
+
+        return userRepository.findByIdAndTenantId(userId, tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     }
 
     @Transactional

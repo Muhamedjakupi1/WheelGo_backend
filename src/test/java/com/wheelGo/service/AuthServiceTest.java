@@ -116,7 +116,7 @@ class AuthServiceTest {
         when(jwtUtils.generateToken(any())).thenReturn("token");
 
         AuthResponse result = authService.signup(
-                new AuthSignUpRequest("user@example.com", "Password1", "tenant", "John", "Doe", "123")
+                new AuthSignUpRequest("user@example.com", "Password1", "tenant", "John", "Doe", "+38349111222")
         );
 
         assertThat(result.token()).isEqualTo("token");
@@ -126,8 +126,16 @@ class AuthServiceTest {
     @Test
     void should_throw_forbidden_when_signup_slug_reserved() {
         assertThatThrownBy(() -> authService.signup(
-                new AuthSignUpRequest("user@example.com", "Password1", "super-admin-tenant", "John", "Doe", "123")))
+                new AuthSignUpRequest("user@example.com", "Password1", "super-admin-tenant", "John", "Doe", "+38349111222")))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Public signup is disabled for this tenant");
+    }
+
+    @Test
+    void should_throw_bad_request_when_signup_phone_contains_letters() {
+        assertThatThrownBy(() -> authService.signup(
+                new AuthSignUpRequest("user@example.com", "Password1", "tenant", "John", "Doe", "123abc")))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Phone number can contain only digits");
     }
 }

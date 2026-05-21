@@ -13,6 +13,7 @@ import java.util.UUID;
 public class CacheInvalidationService {
 
     private final CacheManager cacheManager;
+    private final TenantCacheKeyService tenantCacheKeyService;
 
     /**
      * Fshin saktësisht vetëm cache-in e rezervimeve të atij përdoruesi.
@@ -34,7 +35,7 @@ public class CacheInvalidationService {
      */
     public void evictBookingsForAdmin() {
         Cache cache = requireCache(CacheNames.BOOKINGS);
-        cache.evict("all");
+        cache.evict("admin:all:" + tenantCacheKeyService.currentTenantScope());
     }
 
     /**
@@ -49,10 +50,27 @@ public class CacheInvalidationService {
      */
     public void evictVehicle(UUID vehicleId) {
         Cache cache = requireCache(CacheNames.VEHICLES);
+        String tenantScope = tenantCacheKeyService.currentTenantScope();
         if (vehicleId != null) {
-            cache.evict("byId:" + vehicleId);
+            cache.evict("byId:" + tenantScope + ":" + vehicleId);
         }
-        cache.evict("all");
+        cache.evict("all:" + tenantScope);
+    }
+
+    public void evictUsersForTenant(UUID tenantId) {
+        if (tenantId == null) {
+            return;
+        }
+        Cache cache = requireCache(CacheNames.USERS);
+        cache.evict("all:" + tenantId);
+    }
+
+    public void evictUserByIdForTenant(UUID tenantId, UUID userId) {
+        if (tenantId == null || userId == null) {
+            return;
+        }
+        Cache cache = requireCache(CacheNames.USERS);
+        cache.evict("byId:" + tenantId + ":" + userId);
     }
 
     private Cache requireCache(String cacheName) {

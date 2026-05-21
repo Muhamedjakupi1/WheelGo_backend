@@ -57,21 +57,21 @@ public class VehicleAdminService {
     private final MaintenanceRecordRepository maintenanceRecordRepository;
 
     @Transactional(readOnly = true)
-    @Cacheable(value = CacheNames.VEHICLES, key = "'all'")
+    @Cacheable(value = CacheNames.VEHICLES, key = "'all:' + @tenantCacheKeyService.currentTenantScope()")
     public List<VehicleResponse> getAll() {
         return toResponses(vehicleRepository.findAllByOrderByCreatedAtDesc());
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = CacheNames.VEHICLES, key = "'byId:' + #id")
+    @Cacheable(value = CacheNames.VEHICLES, key = "'byId:' + @tenantCacheKeyService.currentTenantScope() + ':' + #id")
     public VehicleResponse getById(UUID id) {
         return toResponses(List.of(findVehicle(id))).getFirst();
     }
 
     @Transactional
     @Caching(
-            put = @CachePut(value = CacheNames.VEHICLES, key = "'byId:' + #result.id"),
-            evict = @CacheEvict(value = CacheNames.VEHICLES, key = "'all'")
+            put = @CachePut(value = CacheNames.VEHICLES, key = "'byId:' + @tenantCacheKeyService.currentTenantScope() + ':' + #result.id"),
+            evict = @CacheEvict(value = CacheNames.VEHICLES, key = "'all:' + @tenantCacheKeyService.currentTenantScope()")
     )
     public VehicleResponse create(VehicleRequest request) {
         validateUniqueFields(request.getPlateNumber(), request.getVin(), null);
@@ -86,8 +86,8 @@ public class VehicleAdminService {
 
     @Transactional
     @Caching(
-            put = @CachePut(value = CacheNames.VEHICLES, key = "'byId:' + #result.id"),
-            evict = @CacheEvict(value = CacheNames.VEHICLES, key = "'all'")
+            put = @CachePut(value = CacheNames.VEHICLES, key = "'byId:' + @tenantCacheKeyService.currentTenantScope() + ':' + #result.id"),
+            evict = @CacheEvict(value = CacheNames.VEHICLES, key = "'all:' + @tenantCacheKeyService.currentTenantScope()")
     )
     public VehicleResponse update(UUID id, VehicleUpdateRequest request) {
         Vehicle vehicle = findVehicle(id);
@@ -123,8 +123,8 @@ public class VehicleAdminService {
 
     @Transactional
     @Caching(evict = {
-            @CacheEvict(value = CacheNames.VEHICLES, key = "'byId:' + #id"),
-            @CacheEvict(value = CacheNames.VEHICLES, key = "'all'")
+            @CacheEvict(value = CacheNames.VEHICLES, key = "'byId:' + @tenantCacheKeyService.currentTenantScope() + ':' + #id"),
+            @CacheEvict(value = CacheNames.VEHICLES, key = "'all:' + @tenantCacheKeyService.currentTenantScope()")
     })
     public void delete(UUID id) {
         Vehicle vehicle = findVehicle(id);
