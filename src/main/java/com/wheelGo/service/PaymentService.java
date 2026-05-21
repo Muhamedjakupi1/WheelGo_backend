@@ -81,12 +81,11 @@ public class PaymentService {
 
     @Transactional(readOnly = true)
     public List<PaymentResponse> getPaymentsForUser(UUID userId, String keyword) {
-        String normalizedKeyword = normalizeKeyword(keyword);
-        if (normalizedKeyword == null) {
+        if (keyword == null || keyword.trim().isEmpty()) {
             return getPaymentsForUser(userId);
         }
 
-        return paymentRepository.searchPaymentsForUser(userId, normalizedKeyword).stream()
+        return paymentRepository.searchPaymentsForUser(userId, keyword.trim()).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -109,12 +108,11 @@ public class PaymentService {
 
     @Transactional(readOnly = true)
     public List<PaymentResponse> getPaymentsForAdmin(String keyword) {
-        String normalizedKeyword = normalizeKeyword(keyword);
-        if (normalizedKeyword == null) {
+        if (keyword == null || keyword.trim().isEmpty()) {
             return getPaymentsForAdmin();
         }
 
-        return paymentRepository.searchPaymentsForAdmin(normalizedKeyword).stream()
+        return paymentRepository.searchPaymentsForAdmin(keyword.trim()).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -159,21 +157,14 @@ public class PaymentService {
         payment.setStatus(PaymentStatus.REFUNDED);
         payment.setUpdatedAt(LocalDateTime.now());
 
-        return toResponse(paymentRepository.save(payment));
+        Payment saved = paymentRepository.save(payment);
+        Invoice invoice = invoiceRepository.findByBookingId(saved.getBookingId()).orElse(null);
+        return toResponse(saved, invoice);
     }
 
     private Payment getPayment(UUID id) {
         return paymentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment not found"));
-    }
-
-    private String normalizeKeyword(String keyword) {
-        if (keyword == null) {
-            return null;
-        }
-
-        String trimmed = keyword.trim();
-        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private Booking getUserBooking(UUID userId, UUID bookingId) {

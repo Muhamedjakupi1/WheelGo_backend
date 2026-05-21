@@ -23,6 +23,7 @@ import com.wheelGo.model.vehicles.Vehicle;
 import com.wheelGo.repository.AddonRepository;
 import com.wheelGo.repository.BookingAddonRepository;
 import com.wheelGo.repository.BookingRepository;
+import com.wheelGo.repository.DriverLicenseRepository;
 import com.wheelGo.repository.MaintenanceRecordRepository;
 import com.wheelGo.repository.PaymentRepository;
 import com.wheelGo.repository.InvoiceRepository;
@@ -83,6 +84,7 @@ public class BookingService {
     private final CacheInvalidationService cacheInvalidationService;
     private final PaymentRepository paymentRepository;
     private final InvoiceRepository invoiceRepository;
+    private final DriverLicenseRepository driverLicenseRepository;
 
     @Transactional
     public BookingResponse createBooking(UUID userId, BookingCreateRequest request) {
@@ -90,6 +92,15 @@ public class BookingService {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        if (driverLicenseRepository.findByUser_Id(userId)
+                .filter(license -> license.getVerifiedAt() != null)
+                .isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "You need a verified driver license before booking. Go to your profile and upload your driver license."
+            );
+        }
 
         Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vehicle not found"));
