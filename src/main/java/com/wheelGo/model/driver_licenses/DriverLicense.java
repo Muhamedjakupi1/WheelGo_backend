@@ -39,7 +39,7 @@ public class DriverLicense {
     private LocalDateTime verifiedAt;
 
     @Column(name="verified")
-    private String verified;
+    private boolean verified = false;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
