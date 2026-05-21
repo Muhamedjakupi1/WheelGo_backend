@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -40,7 +41,7 @@ class MaintenanceAdminControllerTest {
         response.setId(UUID.randomUUID());
         response.setVehicleName("BMW X5");
         response.setType(MaintenanceType.REPAIR);
-        when(maintenanceAdminService.getAll()).thenReturn(List.of(response));
+        when(maintenanceAdminService.getAll(isNull())).thenReturn(List.of(response));
 
         mockMvc.perform(get("/api/v1/admin/maintenances").with(user("admin").roles("ADMIN")))
                 .andExpect(status().isOk())

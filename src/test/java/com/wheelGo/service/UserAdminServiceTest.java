@@ -70,7 +70,7 @@ class UserAdminServiceTest {
     @Test
     void should_return_all_users_when_get_all() {
         when(adminAccessService.requireCurrentTenantId()).thenReturn(tenantId);
-        when(userRepository.findAllByTenantIdOrderByCreatedAtDesc(tenantId)).thenReturn(List.of(user));
+        when(userRepository.findAllByTenantIdAndRoleOrderByCreatedAtDesc(tenantId, Role.USER)).thenReturn(List.of(user));
 
         List<UserResponse> result = userAdminService.getAll();
 
