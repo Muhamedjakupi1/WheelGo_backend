@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -37,6 +38,26 @@ public class FileStorageService {
 
     public String storeProfileAvatar(MultipartFile file) {
         return storeImage(file, "profile-avatars", null);
+    }
+
+    public String storeInvoicePdf(String invoiceNumber, byte[] content) {
+        if (content == null || content.length == 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invoice PDF content is required");
+        }
+
+        try {
+            Path targetDir = uploadRoot.resolve("invoices");
+            Files.createDirectories(targetDir);
+
+            String safeInvoiceNumber = sanitizeFileName(invoiceNumber);
+            String fileName = safeInvoiceNumber + "-" + UUID.randomUUID() + ".pdf";
+            Path targetFile = targetDir.resolve(fileName).normalize();
+            Files.write(targetFile, content);
+
+            return "/uploads/invoices/" + fileName;
+        } catch (IOException ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to store invoice PDF");
+        }
     }
 
     public Path resolveStoredUpload(String relativeUrl) {
@@ -86,5 +107,10 @@ public class FileStorageService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image file extension is missing");
         }
         return filename.substring(index + 1).toLowerCase();
+    }
+
+    private String sanitizeFileName(String value) {
+        String normalized = value == null || value.isBlank() ? "invoice" : value.trim().toLowerCase(Locale.ROOT);
+        return normalized.replaceAll("[^a-z0-9._-]", "-");
     }
 }

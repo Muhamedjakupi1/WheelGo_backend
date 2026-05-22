@@ -6,16 +6,20 @@ import com.wheelGo.model.enums.BookingStatus;
 import com.wheelGo.model.enums.PaymentMethod;
 import com.wheelGo.model.enums.PaymentStatus;
 import com.wheelGo.model.invoices.Invoice;
+import com.wheelGo.model.invoices.InvoiceEmailRequest;
 import com.wheelGo.model.payments.Payment;
 import com.wheelGo.model.payments.PaymentRequest;
 import com.wheelGo.model.payments.PaymentResponse;
 import com.wheelGo.repository.BookingRepository;
 import com.wheelGo.repository.InvoiceRepository;
 import com.wheelGo.repository.PaymentRepository;
+import com.wheelGo.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
@@ -34,6 +38,9 @@ public class PaymentService {
     private final PaymentMapper paymentMapper;
     private final InvoiceRepository invoiceRepository;
     private final InvoiceEmailJobService invoiceEmailJobService;
+    private final UserRepository userRepository;
+    private final InvoicePdfService invoicePdfService;
+    private final FileStorageService fileStorageService;
 
     @Transactional
     public PaymentResponse payForBooking(UUID userId, PaymentRequest request) {
@@ -59,7 +66,7 @@ public class PaymentService {
         payment.setUpdatedAt(LocalDateTime.now());
 
         Payment saved = paymentRepository.save(payment);
-        Invoice invoice = ensureInvoice(saved);
+        Invoice invoice = ensureInvoice(saved, booking);
 
         return toResponse(saved, invoice);
     }
@@ -134,7 +141,9 @@ public class PaymentService {
         payment.setUpdatedAt(LocalDateTime.now());
 
         Payment saved = paymentRepository.save(payment);
-        Invoice invoice = ensureInvoice(saved);
+        Booking booking = bookingRepository.findById(saved.getBookingId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+        Invoice invoice = ensureInvoice(saved, booking);
 
         return toResponse(saved, invoice);
     }
@@ -219,23 +228,78 @@ public class PaymentService {
         return status == PaymentStatus.PAID ? LocalDateTime.now() : null;
     }
 
-    private Invoice ensureInvoice(Payment payment) {
+    private Invoice ensureInvoice(Payment payment, Booking booking) {
         if (payment.getStatus() != PaymentStatus.PAID) {
             return invoiceRepository.findByBookingId(payment.getBookingId()).orElse(null);
         }
 
-        Invoice invoice = invoiceRepository.findByBookingId(payment.getBookingId())
-                .orElseGet(() -> {
-                    Invoice created = new Invoice();
-                    created.setBookingId(payment.getBookingId());
-                    created.setInvoiceNumber("INV-" + System.currentTimeMillis());
-                    created.setIssuedAt(LocalDateTime.now());
-                    created.setCreatedAt(LocalDateTime.now());
-                    return invoiceRepository.save(created);
-                });
+        Invoice existing = invoiceRepository.findByBookingId(payment.getBookingId()).orElse(null);
+        if (existing != null) {
+            String customerEmail = findCustomerEmail(booking);
+            InvoiceEmailRequest invoiceRequest = buildInvoiceRequest(existing, payment, booking, customerEmail);
+            if (existing.getPdfUrl() == null || existing.getPdfUrl().isBlank()) {
+                existing.setPdfUrl(fileStorageService.storeInvoicePdf(
+                        existing.getInvoiceNumber(),
+                        invoicePdfService.generateInvoicePdf(invoiceRequest)
+                ));
+                existing = invoiceRepository.save(existing);
+            }
+            scheduleInvoiceEmail(existing, invoiceRequest);
+            return existing;
+        }
 
-        invoiceEmailJobService.sendInvoiceEmail(invoice.getInvoiceNumber());
-        return invoice;
+        Invoice invoice = new Invoice();
+        invoice.setBookingId(payment.getBookingId());
+        invoice.setInvoiceNumber("INV-" + System.currentTimeMillis());
+        invoice.setIssuedAt(LocalDateTime.now());
+        invoice.setCreatedAt(LocalDateTime.now());
+        String customerEmail = findCustomerEmail(booking);
+        InvoiceEmailRequest invoiceRequest = buildInvoiceRequest(invoice, payment, booking, customerEmail);
+        invoice.setPdfUrl(fileStorageService.storeInvoicePdf(
+                invoice.getInvoiceNumber(),
+                invoicePdfService.generateInvoicePdf(invoiceRequest)
+        ));
+        Invoice saved = invoiceRepository.save(invoice);
+
+        scheduleInvoiceEmail(saved, invoiceRequest);
+        return saved;
+    }
+
+    private void scheduleInvoiceEmail(Invoice invoice, InvoiceEmailRequest emailRequest) {
+        if (emailRequest.recipientEmail() == null || emailRequest.recipientEmail().isBlank()) {
+            return;
+        }
+
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            invoiceEmailJobService.sendInvoiceEmail(emailRequest);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                invoiceEmailJobService.sendInvoiceEmail(emailRequest);
+            }
+        });
+    }
+
+    private String findCustomerEmail(Booking booking) {
+        return userRepository.findById(booking.getUserId())
+                .map(user -> user.getEmail())
+                .orElse(null);
+    }
+
+    private InvoiceEmailRequest buildInvoiceRequest(Invoice invoice, Payment payment, Booking booking, String customerEmail) {
+        return new InvoiceEmailRequest(
+                customerEmail,
+                booking.getId(),
+                invoice.getInvoiceNumber(),
+                payment.getAmount(),
+                payment.getCurrency(),
+                payment.getPaidAt(),
+                booking.getStartDate(),
+                booking.getEndDate()
+        );
     }
 
     private PaymentResponse toResponse(Payment payment) {
