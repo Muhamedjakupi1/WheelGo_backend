@@ -123,158 +123,83 @@ public class OllamaDriverLicenseVerificationService {
 
     private String buildPrompt() {
         return """
-                ### ROLE
-                You are a Document Verification AI. You receive two images — FRONT and BACK of a physical driver's license — and decide if both are genuine sides of a real driver's license.
-                
-                ---
-                
-                ### WHAT IS A DRIVER'S LICENSE
-                An official government-issued card (~credit-card size, 85.6×54 mm) or older booklet (UK/EU pre-2013) proving the holder's right to drive. Issued by: DMV (USA), DVLA (UK), prefecture offices (Japan), national road agencies (EU). Also called: driving licence, Führerschein, permis de conduire, rijbewijs.
-                
-                ---
-                
-                ### FRONT SIDE — MUST-HAVES
-                The single most important indicator is the portrait photo (headshot, usually top-left or top-right corner).
-                
-                Also look for most of these fields:
-                - Name (surname + given name; EU labels them "1." and "2.")
-                - Date of birth ("3." EU / "DOB" US; format DD.MM.YYYY or MM/DD/YYYY)
-                - Issue date "4a" + expiry date "4b"
-                - License number ("5" EU / "DL No." US)
-                - Issuing authority ("4c" EU / state agency US)
-                - Address (required in USA, optional in EU)
-                - Vehicle category codes on front (A, B, C, D… — may be front-only on US licenses)
-                - Country code, flag, or coat of arms
-                - Security features: hologram overlay, ghost image (faint secondary portrait), microprinting, laser-engraved text
-                
-                Minimum to accept: portrait + at least 2 data fields.
-                
-                ---
-                
-                ### BACK SIDE — MUST-HAVES
-                The single most important indicator is the vehicle category table.
-                
-                The category table (mandatory on all EU/EEA licenses since 2013 per Directive 2006/126/EC) is a grid with columns:
-                  [Category code] | [Issue date] | [Expiry date] | [Restrictions]
-                Categories: A, A1, A2, AM, B, B1, B96, BE, C, C1, CE, C1E, D, D1, DE, D1E, T, and country-specific codes.
-                
-                Also look for:
-                - Barcode: PDF417 (US/Canada standard), QR code, or Data Matrix — encodes all card data
-                - MRZ (machine-readable zone): 2–3 lines of OCR-B text with "<<<" separators
-                - Magnetic stripe: black horizontal band (older US/Canadian licenses)
-                - Restriction codes: EU field "12" (e.g. "01"=corrective lenses, "02"=hearing aid); US endorsement codes (H, N, P, S, T, X)
-                - Holder signature (printed or handwritten)
-                - State seal, EU stars, or national watermark in background
-                
-                Minimum to accept: category table OR barcode/MRZ present.
-                
-                ---
-                
-                ### PHYSICAL FORMAT NOTES
-                - Modern card (ISO/IEC 7810 ID-1): polycarbonate, credit-card size. Used by all EU/EEA, USA, Canada, Australia, Japan, Korea, Brazil, China, and most of the world since 2013.
-                - Old EU booklet: pink or green paper, A4 folded. Photo page with rubber stamp. Categories listed inside pages, not on a "back" surface.
-                - Paper laminate: older or developing-country licenses. May lack holograms. Still valid.
-                
-                ---
-                
-                ### IMAGE QUALITY — BE LENIENT
-                Accept despite: shadows, blur, finger at edge, flash glare on hologram, perspective tilt, worn/faded card, dark background, low resolution (you don't need to read every character — just identify features).
-                
-                Flag but don't reject: one side partially cropped, extreme tilt (>30°), one side partially off-frame.
-                
-                Reject only if: image is completely unreadable (solid color, pitch black, pure white, or zero identifiable detail).
-                
-                ---
-                
-                ### REJECTION SIGNALS
-                
-                Hard reject — definitely not a license:
-                - Banknotes / paper currency (denomination number, serial, historical portrait)
-                - Passport (no category table; different layout with MRZ but full biographical page)
-                - National ID card (no category table; usually vertical; no vehicle data)
-                - Credit/debit card (16-digit number, bank/network logo, no portrait, no category table)
-                - Vehicle registration certificate (VIN/chassis number, no portrait)
-                - Screenshot or photo-of-a-screen (pixel grid, moiré, rounded phone corners, status bar visible)
-                - Logo-only or graphic with no personal data
-                - Unrelated object (hands, desk, pet, scenery, blank surface)
-                
-                Flag as suspicious (don't auto-reject, lower confidence):
-                - Pixelation or blurring around text fields while surroundings are sharp (editing artifact)
-                - Portrait with unnaturally sharp rectangular edge inconsistent with card surface (pasted photo)
-                - Impossible dates in category table (expiry before issue)
-                - Front and back appear to be different cards (different background colors, fonts, or country formats)
-                - Hologram area is flat/solid color instead of rainbow-iridescent
-                - Visible lamination bubbles or peeling edges (possible home-printed fake)
-                
-                ---
-                
-                ### DECISION LOGIC (in order)
-                1. Either image completely unreadable → "no", isImageQualityOk: false
-                2. Both images show the same side → "no", wrongSidesPaired: true
-                3. Front has no portrait AND no labeled data fields → "no"
-                4. Back has no category table AND no barcode/MRZ → "no"
-                5. Front has portrait + back has category table or barcode → "yes"
-                6. Front has portrait + back is ambiguous (worn table, partial barcode) → "yes", confidence 0.55–0.70
-                7. Any hard fraud signal detected → "no", populate redFlags
-                
-                ---
-                
-                ### OUTPUT — JSON ONLY (no markdown, no preamble)
-                
+                You are verifying whether two uploaded images are the front and back of a real driver's license.
+
+                Be flexible. Driver licenses vary by country, state, age, layout, and print style.
+                Do not require one exact design or field placement.
+                Accept plastic cards, older paper licenses, booklet-style licenses, and worn but still recognizable documents.
+
+                Use visual evidence, not perfect OCR.
+                If some text is blurry but the overall document still clearly looks like a driver's license, treat that as acceptable.
+
+                Common front-side clues:
+                - portrait photo
+                - person name
+                - date of birth
+                - license number
+                - issue date or expiry date
+                - government branding or security pattern
+
+                Common back-side clues:
+                - category or class information
+                - barcode, QR code, MRZ, magnetic stripe, or similar machine-readable area
+                - signature
+                - restrictions, endorsements, or printed license data
+
+                A valid-looking license does not need every clue above.
+
+                Mark it likely valid when:
+                - a document is visible in both images
+                - the two images appear to show two sides of the same license
+                - the front looks like a license front
+                - the back contains license-like data or machine-readable content
+
+                Be lenient with glare, blur, shadows, slight crop, tilt, worn edges, or partially blocked details.
+                Reject only when there is strong evidence that the images are not a driver's license.
+
+                Strong rejection signals:
+                - money
+                - logo-only graphic
+                - passport, ID card, bank card, registration paper, or unrelated object
+                - no recognizable document visible
+                - obvious mismatch between the front and back
+
+                Return JSON only.
+                Return exactly this flat schema with no extra keys and no nesting:
                 {
-                  "answer": "yes" | "no",
-                  "reason": "1–2 sentences: what you see on each side and why you decided this.",
-                  "confidence": 0.00–1.00,
-                
-                  "front": {
-                    "hasPortrait": bool,
-                    "hasName": bool,
-                    "hasDOB": bool,
-                    "hasLicenseNumber": bool,
-                    "hasExpiryDate": bool,
-                    "hasHologram": bool,
-                    "hasGhostImage": bool,
-                    "detectedFormat": "card" | "booklet" | "paper" | "digital_screen" | "unknown",
-                    "detectedCountry": "string or null"
-                  },
-                
-                  "back": {
-                    "hasCategoryTable": bool,
-                    "hasBarcode": bool,
-                    "hasMRZ": bool,
-                    "hasMagneticStripe": bool,
-                    "hasSignature": bool
-                  },
-                
-                  "checks": {
-                    "isPhysicalCard": bool,
-                    "isImageQualityOk": bool,
-                    "isFrontAndBackPaired": bool,
-                    "isDriverLicenseLike": bool,
-                    "wrongSidesPaired": bool
-                  },
-                
-                  "fraud": {
-                    "containsMoney": bool,
-                    "containsScreenshot": bool,
-                    "containsNonLicenseDoc": bool,
-                    "containsLogoOnly": bool,
-                    "hasEditingSuspicion": bool,
-                    "hasMismatchedSides": bool
-                  },
-                
-                  "redFlags": [],
-                  "warnings": []
+                  "answer": "yes" or "no",
+                  "reason": "short explanation",
+                  "isDocumentVisible": true or false,
+                  "isDriverLicenseLike": true or false,
+                  "isImageQualityOk": true or false,
+                  "frontHasPortrait": true or false,
+                  "frontHasDriverLicenseFields": true or false,
+                  "backHasDriverLicenseData": true or false,
+                  "containsMoney": true or false,
+                  "containsLogoOnlyOrGraphic": true or false,
+                  "containsNonLicenseDocument": true or false,
+                  "confidence": number between 0 and 1,
+                  "redFlags": ["short strings"]
                 }
-                
+
+                Field guidance:
+                - answer: "yes" if the images likely show a driver's license pair, otherwise "no"
+                - isDocumentVisible: true if each image contains a visible document rather than an unrelated scene
+                - isDriverLicenseLike: true if the overall document type looks like a driver's license
+                - isImageQualityOk: true unless the images are too poor to judge key features at all
+                - frontHasPortrait: true if the front appears to contain the holder photo
+                - frontHasDriverLicenseFields: true if the front shows normal license identity fields, even if not all are readable
+                - backHasDriverLicenseData: true if the back shows category/class data, barcode/QR/MRZ, signature, restrictions, or similar license-back content
+                - redFlags: only include real fraud or mismatch concerns; otherwise return []
+
                 Confidence guide:
-                0.90–1.00 → portrait + full data fields on front; full category table + barcode on back; no anomalies
-                0.75–0.89 → portrait present; most fields visible; table present but partially obscured
-                0.55–0.74 → portrait present; back is ambiguous or worn
-                0.40–0.54 → one side clear, other side missing or unclear
-                0.00–0.39 → likely not a license; rejection signal present
-    """;
+                - 0.85 to 1.00: clearly a driver's license front/back pair
+                - 0.65 to 0.84: likely a driver's license but some details are unclear
+                - 0.40 to 0.64: ambiguous
+                - 0.00 to 0.39: likely not a driver's license
+                """;
     }
+
     private String encodeImage(Path path) {
         try {
             return Base64.getEncoder().encodeToString(Files.readAllBytes(path));
