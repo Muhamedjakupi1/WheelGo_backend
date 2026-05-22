@@ -32,7 +32,7 @@ class UserSettingsControllerTest {
     private UserSettingsService userSettingsService;
 
     @Test
-    void should_return_no_content_when_change_password_valid() throws Exception {
+    void should_return_ok_when_change_password_valid() throws Exception {
         UUID userId = UUID.randomUUID();
 
         try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
@@ -41,13 +41,13 @@ class UserSettingsControllerTest {
             mockMvc.perform(put("/api/user-settings/me/password")
                             .with(user("user").roles("USER"))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("""
-                                    {
-                                      "currentPassword":"OldPassword1",
-                                      "newPassword":"NewPassword1"
-                                    }
-                                    """))
-                    .andExpect(status().isNoContent());
+                    .content("""
+                            {
+                              "currentPassword":"OldPassword1",
+                              "newPassword":"NewPassword1"
+                            }
+                            """))
+                    .andExpect(status().isOk());
         }
     }
 
