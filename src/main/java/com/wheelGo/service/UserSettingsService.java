@@ -2,8 +2,11 @@ package com.wheelGo.service;
 
 import com.wheelGo.model.enums.AuditAction;
 import com.wheelGo.model.user.User;
+import com.wheelGo.model.user_settings.UserSettings;
 import com.wheelGo.model.user_settings.UserSettingsPasswordUpdateRequest;
+import com.wheelGo.model.user_settings.UserSettingsPasswordUpdateResponse;
 import com.wheelGo.repository.UserRepository;
+import com.wheelGo.repository.UserSettingsRepository;
 import com.wheelGo.tools.SecurityUtils;
 import com.wheelGo.validation.PasswordPolicy;
 import lombok.RequiredArgsConstructor;
@@ -21,11 +24,27 @@ import java.util.UUID;
 public class UserSettingsService {
 
     private final UserRepository userRepository;
+    private final UserSettingsRepository userSettingsRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditLogService auditLogService;
 
+    @Transactional(readOnly = true)
+    public UserSettingsPasswordUpdateResponse getSettings(UUID userId) {
+        User user = findCurrentUser(userId);
+
+        return userSettingsRepository.findByUser_Id(user.getId())
+                .map(this::toResponse)
+                .orElseGet(() -> {
+                    UserSettingsPasswordUpdateResponse response = new UserSettingsPasswordUpdateResponse();
+                    response.setUserId(user.getId());
+                    response.setPasswordChanged(false);
+                    response.setUpdatedAt(null);
+                    return response;
+                });
+    }
+
     @Transactional
-    public void changePassword(UUID userId, UserSettingsPasswordUpdateRequest request) {
+    public UserSettingsPasswordUpdateResponse changePassword(UUID userId, UserSettingsPasswordUpdateRequest request) {
         User user = findCurrentUser(userId);
 
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
@@ -36,19 +55,58 @@ public class UserSettingsService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, PasswordPolicy.MESSAGE);
         }
 
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The new password cannot be the same as the current password");
+        }
+
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         user.setUpdatedAt(LocalDateTime.now());
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        UserSettings settings = userSettingsRepository.findByUser_Id(savedUser.getId())
+                .orElseGet(() -> {
+                    UserSettings newSettings = new UserSettings();
+                    newSettings.setUser(savedUser);
+                    return newSettings;
+                });
+        settings.setPassword(savedUser.getPasswordHash());
+        settings.setPasswordChanged(true);
+        UserSettings savedSettings = userSettingsRepository.save(settings);
+
+        UserSettingsPasswordUpdateResponse response = toResponse(savedSettings);
 
         auditLogService.logForSchema(
-                user.getTenant().getSchemaName(),
-                user.getId(),
+                savedUser.getTenant().getSchemaName(),
+                savedUser.getId(),
                 AuditAction.UPDATE,
                 "UserSettingsPassword",
-                user.getId(),
+                savedUser.getId(),
                 null,
-                new PasswordChangedSnapshot(true)
+                response
         );
+
+        return response;
+    }
+
+    @Transactional
+    public void createInitialSettings(User user) {
+        if (userSettingsRepository.findByUser_Id(user.getId()).isPresent()) {
+            return;
+        }
+
+        UserSettings settings = new UserSettings();
+        settings.setUser(user);
+        settings.setPassword(user.getPasswordHash());
+        settings.setPasswordChanged(false);
+        userSettingsRepository.save(settings);
+    }
+
+    private UserSettingsPasswordUpdateResponse toResponse(UserSettings settings) {
+        UserSettingsPasswordUpdateResponse response = new UserSettingsPasswordUpdateResponse();
+        response.setUserId(settings.getUser().getId());
+        response.setPasswordChanged(settings.isPasswordChanged());
+        response.setUpdatedAt(settings.getUpdatedAt());
+        return response;
     }
 
     private User findCurrentUser(UUID userId) {
@@ -60,6 +118,4 @@ public class UserSettingsService {
         return userRepository.findByIdAndTenantId(userId, tenantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     }
-
-    private record PasswordChangedSnapshot(Boolean passwordChanged) {}
 }

@@ -39,6 +39,7 @@ public class AuthService {
     private final UserProfileRepository userProfileRepository;
     private final TenantSchemaExecutor tenantSchemaExecutor;
     private final CacheInvalidationService cacheInvalidationService;
+    private final UserSettingsService userSettingsService;
 
 
     public AuthResponse login(AuthLoginRequest req) {
@@ -134,6 +135,7 @@ public class AuthService {
             profile.setLastName(lastName);
             profile.setPhone(phone);
             userProfileRepository.save(profile);
+            userSettingsService.createInitialSettings(saved);
         });
 
         cacheInvalidationService.evictUsersForTenant(tenant.getId());
