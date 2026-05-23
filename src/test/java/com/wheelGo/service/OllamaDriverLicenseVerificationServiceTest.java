@@ -39,7 +39,7 @@ class OllamaDriverLicenseVerificationServiceTest {
     }
 
     @Test
-    void should_throw_bad_gateway_when_ollama_request_fails() throws Exception {
+    void should_throw_bad_gateway_when_async_ollama_request_fails() throws Exception {
         Path front = Files.createTempFile("front", ".png");
         Path back = Files.createTempFile("back", ".png");
         Files.write(front, new byte[]{1});
@@ -48,6 +48,6 @@ class OllamaDriverLicenseVerificationServiceTest {
 
         assertThatThrownBy(() -> service.verify(front, back))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("Failed to parse Ollama verification result");
+                .hasMessageContaining("Failed to verify driver license with Ollama");
     }
 }

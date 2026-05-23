@@ -8,6 +8,7 @@ import com.wheelGo.model.tenant.Tenant;
 import com.wheelGo.model.user.User;
 import com.wheelGo.repository.DriverLicenseRepository;
 import com.wheelGo.repository.UserRepository;
+import com.wheelGo.schema.TenantSchemaExecutor;
 import com.wheelGo.security.CustomUserPrincipal;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -38,6 +40,7 @@ class DriverLicenseServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private FileStorageService fileStorageService;
     @Mock private OllamaDriverLicenseVerificationService ollamaDriverLicenseVerificationService;
+    @Mock private TenantSchemaExecutor tenantSchemaExecutor;
     @InjectMocks private DriverLicenseService driverLicenseService;
 
     private UUID userId;
@@ -143,9 +146,14 @@ class DriverLicenseServiceTest {
         when(driverLicenseRepository.save(any(DriverLicense.class))).thenReturn(license);
         when(fileStorageService.resolveStoredUpload("/uploads/front.png")).thenReturn(java.nio.file.Path.of("front.png"));
         when(fileStorageService.resolveStoredUpload("/uploads/back.png")).thenReturn(java.nio.file.Path.of("back.png"));
-        when(ollamaDriverLicenseVerificationService.verify(any(), any())).thenReturn(verification);
+        when(ollamaDriverLicenseVerificationService.verifyAsync(any(), any()))
+                .thenReturn(CompletableFuture.completedFuture(verification));
+        when(tenantSchemaExecutor.callInSchema(any(), any())).thenAnswer(invocation -> {
+            java.util.function.Supplier<?> supplier = invocation.getArgument(1);
+            return supplier.get();
+        });
 
-        DriverLicenseVerificationResponse result = driverLicenseService.verifyMyLicense(userId, null);
+        DriverLicenseVerificationResponse result = driverLicenseService.verifyMyLicense(userId, null).join();
 
         assertThat(result.isVerified()).isTrue();
     }

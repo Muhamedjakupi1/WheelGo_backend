@@ -57,9 +57,16 @@ public class UserProfileService {
 
     @Transactional
     public UserProfileResponse getProfileByUserId(UUID userId) {
-        User user = findCurrentUser(userId);
-        UserProfile profile = userProfileRepository.findByUser_Id(userId)
-                .orElseGet(() -> createDefaultProfile(userId));
+        UserProfile profile = userProfileRepository.findByUser_Id(userId).orElse(null);
+        User user;
+
+        if (profile != null) {
+            user = profile.getUser() != null ? profile.getUser() : findCurrentUser(userId);
+        } else {
+            user = findCurrentUser(userId);
+            profile = createDefaultProfile(user);
+        }
+
         return enrichProfileResponse(userProfileMapper.toResponse(profile), user);
     }
 
@@ -103,7 +110,7 @@ public class UserProfileService {
     @Transactional
     public UserProfileResponse uploadAvatar(UUID userId, MultipartFile file) {
         UserProfile profile = userProfileRepository.findByUser_Id(userId)
-                .orElseGet(() -> createDefaultProfile(userId));
+                .orElseGet(() -> createDefaultProfile(findCurrentUser(userId)));
 
         String avatarUrl = fileStorageService.storeProfileAvatar(file);
         profile.setAvatarUrl(avatarUrl);
@@ -123,9 +130,7 @@ public class UserProfileService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    private UserProfile createDefaultProfile(UUID userId) {
-        User user = findCurrentUser(userId);
-
+    private UserProfile createDefaultProfile(User user) {
         UserProfile profile = new UserProfile();
         profile.setUser(user);
         profile.setFirstName("User");

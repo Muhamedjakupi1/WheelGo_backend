@@ -18,12 +18,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 @Service
 @RequiredArgsConstructor
 public class OllamaDriverLicenseVerificationService {
 
     private final ObjectMapper objectMapper;
+    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Value("${app.ollama.driver-license.api-url:http://localhost:11434/api/chat}")
     private String ollamaApiUrl;
@@ -33,6 +36,15 @@ public class OllamaDriverLicenseVerificationService {
 
     public DriverLicenseVerificationResponse verify(Path frontImagePath,
                                                     Path backImagePath) {
+        try {
+            return verifyAsync(frontImagePath, backImagePath).join();
+        } catch (CompletionException ex) {
+            throw unwrapCompletionException(ex);
+        }
+    }
+
+    public CompletableFuture<DriverLicenseVerificationResponse> verifyAsync(Path frontImagePath,
+                                                                            Path backImagePath) {
         String frontImageBase64 = encodeImage(frontImagePath);
         String backImageBase64 = encodeImage(backImagePath);
 
@@ -49,31 +61,47 @@ public class OllamaDriverLicenseVerificationService {
         );
 
         try {
-            HttpClient client = HttpClient.newHttpClient();
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(ollamaApiUrl))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(request)))
                     .build();
 
-            HttpResponse<String> response = client.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Ollama verification request failed");
-            }
+            return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                    .handle((response, throwable) -> {
+                        if (throwable != null) {
+                            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to verify driver license with Ollama");
+                        }
 
-            OllamaChatResponse ollamaResponse = objectMapper.readValue(response.body(), OllamaChatResponse.class);
-            if (ollamaResponse.message() == null || ollamaResponse.message().content() == null || ollamaResponse.message().content().isBlank()) {
-                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Ollama returned an empty verification result");
-            }
+                        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Ollama verification request failed");
+                        }
 
-            SimpleAnswer ai = objectMapper.readValue(ollamaResponse.message().content(), SimpleAnswer.class);
-            return toVerificationResponse(ai);
+                        try {
+                            OllamaChatResponse ollamaResponse = objectMapper.readValue(response.body(), OllamaChatResponse.class);
+                            if (ollamaResponse.message() == null || ollamaResponse.message().content() == null || ollamaResponse.message().content().isBlank()) {
+                                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Ollama returned an empty verification result");
+                            }
+
+                            SimpleAnswer ai = objectMapper.readValue(ollamaResponse.message().content(), SimpleAnswer.class);
+                            return toVerificationResponse(ai);
+                        } catch (IOException ex) {
+                            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to parse Ollama verification result");
+                        }
+                    });
         } catch (IOException ex) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to parse Ollama verification result");
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to verify driver license with Ollama");
+            return CompletableFuture.failedFuture(
+                    new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to parse Ollama verification result")
+            );
         }
+    }
+
+    private ResponseStatusException unwrapCompletionException(CompletionException ex) {
+        Throwable cause = ex.getCause();
+        if (cause instanceof ResponseStatusException responseStatusException) {
+            return responseStatusException;
+        }
+        return new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to verify driver license with Ollama");
     }
 
     private DriverLicenseVerificationResponse toVerificationResponse(SimpleAnswer ai) {

@@ -7,6 +7,8 @@ import com.wheelGo.model.driver_licenses.DriverLicenseVerificationResponse;
 import com.wheelGo.model.user.User;
 import com.wheelGo.repository.DriverLicenseRepository;
 import com.wheelGo.repository.UserRepository;
+import com.wheelGo.schema.TenantContext;
+import com.wheelGo.schema.TenantSchemaExecutor;
 import com.wheelGo.tools.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,6 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +30,7 @@ public class DriverLicenseService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final OllamaDriverLicenseVerificationService ollamaDriverLicenseVerificationService;
+    private final TenantSchemaExecutor tenantSchemaExecutor;
 
     @Transactional(readOnly = true)
     public DriverLicenseResponse getMyLicense(UUID userId) {
@@ -68,15 +72,22 @@ public class DriverLicenseService {
     }
 
     @Transactional
-    public DriverLicenseVerificationResponse verifyMyLicense(UUID userId, DriverLicenseUpdateRequest request) {
-        return verifyMyLicense(userId, request, null, null);
+    public CompletableFuture<DriverLicenseVerificationResponse> verifyMyLicense(UUID userId, DriverLicenseUpdateRequest request) {
+        return verifyMyLicenseInternal(userId, request, null, null);
     }
 
     @Transactional
-    public DriverLicenseVerificationResponse verifyMyLicense(UUID userId,
-                                                            DriverLicenseUpdateRequest request,
-                                                            MultipartFile frontImage,
-                                                            MultipartFile backImage) {
+    public CompletableFuture<DriverLicenseVerificationResponse> verifyMyLicense(UUID userId,
+                                                                                DriverLicenseUpdateRequest request,
+                                                                                MultipartFile frontImage,
+                                                                                MultipartFile backImage) {
+        return verifyMyLicenseInternal(userId, request, frontImage, backImage);
+    }
+
+    private CompletableFuture<DriverLicenseVerificationResponse> verifyMyLicenseInternal(UUID userId,
+                                                                                         DriverLicenseUpdateRequest request,
+                                                                                         MultipartFile frontImage,
+                                                                                         MultipartFile backImage) {
         User user = findCurrentUser(userId);
         DriverLicense license = driverLicenseRepository.findByUser_Id(userId)
                 .orElseGet(() -> createEmptyLicense(user));
@@ -98,17 +109,17 @@ public class DriverLicenseService {
         license.setUpdatedAt(LocalDateTime.now());
         clearVerificationState(license);
         driverLicenseRepository.save(license);
+        String schemaName = TenantContext.getCurrentSchema();
 
-        DriverLicenseVerificationResponse response = ollamaDriverLicenseVerificationService.verify(
+        return ollamaDriverLicenseVerificationService.verifyAsync(
                 fileStorageService.resolveStoredUpload(license.getFrontImageUrl()),
                 fileStorageService.resolveStoredUpload(license.getBackImageUrl())
-        );
-
-        applyVerificationResult(license, response.isVerified());
-        DriverLicense saved = driverLicenseRepository.save(license);
-
-        response.setLicense(toResponse(saved, userId));
-        return response;
+        ).thenApply(response -> tenantSchemaExecutor.callInSchema(schemaName, () -> {
+            applyVerificationResult(license, response.isVerified());
+            DriverLicense saved = driverLicenseRepository.save(license);
+            response.setLicense(toResponse(saved, userId));
+            return response;
+        }));
     }
 
     private void applyRequiredDetailsForVerification(DriverLicense license, DriverLicenseUpdateRequest request) {
