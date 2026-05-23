@@ -46,6 +46,12 @@
 			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
 
+		<!-- Email -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+
 		<!-- PostgreSQL -->
 		<dependency>
 			<groupId>org.postgresql</groupId>
@@ -181,7 +187,7 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<configuration>
 					<argLine>
-						-javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar
+						-javaagent:"${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar"
 					</argLine>
 				</configuration>
 			</plugin>

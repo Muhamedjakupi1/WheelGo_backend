@@ -34,6 +34,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -161,13 +162,14 @@ class BookingServiceTest {
 
     @Test
     void should_throw_conflict_when_vehicle_under_maintenance_until_requested_start_date() {
+        LocalDate maintenanceEnd = LocalDate.now().plusDays(10);
         vehicle.setStatus(VehicleStatus.MAINTENANCE);
         BookingCreateRequest request = new BookingCreateRequest();
         request.setVehicleId(vehicleId);
-        request.setStartDate(LocalDate.of(2026, 5, 21));
-        request.setEndDate(LocalDate.of(2026, 5, 23));
+        request.setStartDate(maintenanceEnd.minusDays(1));
+        request.setEndDate(maintenanceEnd.plusDays(1));
         MaintenanceRecord maintenanceRecord = new MaintenanceRecord();
-        maintenanceRecord.setNextDueAt(LocalDateTime.of(2026, 5, 22, 9, 0));
+        maintenanceRecord.setNextDueAt(maintenanceEnd.atTime(9, 0));
 
         when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
@@ -178,18 +180,19 @@ class BookingServiceTest {
 
         assertThatThrownBy(() -> bookingService.createBooking(userId, request))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("under maintenance until 22 May 2026");
+                .hasMessageContaining("under maintenance until " + maintenanceEnd.format(DateTimeFormatter.ofPattern("d MMM yyyy")));
     }
 
     @Test
     void should_create_booking_when_vehicle_maintenance_ends_on_requested_start_date() {
+        LocalDate maintenanceEnd = LocalDate.now().plusDays(10);
         vehicle.setStatus(VehicleStatus.MAINTENANCE);
         BookingCreateRequest request = new BookingCreateRequest();
         request.setVehicleId(vehicleId);
-        request.setStartDate(LocalDate.of(2026, 5, 22));
-        request.setEndDate(LocalDate.of(2026, 5, 24));
+        request.setStartDate(maintenanceEnd);
+        request.setEndDate(maintenanceEnd.plusDays(2));
         MaintenanceRecord maintenanceRecord = new MaintenanceRecord();
-        maintenanceRecord.setNextDueAt(LocalDateTime.of(2026, 5, 22, 9, 0));
+        maintenanceRecord.setNextDueAt(maintenanceEnd.atTime(9, 0));
 
         Booking saved = new Booking();
         saved.setId(UUID.randomUUID());
