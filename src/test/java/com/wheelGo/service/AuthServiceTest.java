@@ -40,6 +40,7 @@ class AuthServiceTest {
     @Mock private UserProfileRepository userProfileRepository;
     @Mock private TenantSchemaExecutor tenantSchemaExecutor;
     @Mock private CacheInvalidationService cacheInvalidationService;
+    @Mock private UserSettingsService userSettingsService;
     @InjectMocks private AuthService authService;
 
     @Test

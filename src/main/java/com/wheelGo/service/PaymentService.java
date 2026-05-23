@@ -10,9 +10,11 @@ import com.wheelGo.model.invoices.InvoiceEmailRequest;
 import com.wheelGo.model.payments.Payment;
 import com.wheelGo.model.payments.PaymentRequest;
 import com.wheelGo.model.payments.PaymentResponse;
+import com.wheelGo.model.promotions.Promotion;
 import com.wheelGo.repository.BookingRepository;
 import com.wheelGo.repository.InvoiceRepository;
 import com.wheelGo.repository.PaymentRepository;
+import com.wheelGo.repository.PromotionRepository;
 import com.wheelGo.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -41,6 +43,8 @@ public class PaymentService {
     private final UserRepository userRepository;
     private final InvoicePdfService invoicePdfService;
     private final FileStorageService fileStorageService;
+    private final PromotionRepository promotionRepository;
+    private final CacheInvalidationService cacheInvalidationService;
 
     @Transactional
     public PaymentResponse payForBooking(UUID userId, PaymentRequest request) {
@@ -49,6 +53,7 @@ public class PaymentService {
         }
 
         Booking booking = getUserBooking(userId, request.getBookingId());
+        applyPromotionCodeIfPresent(booking, request.getPromotionCode());
         BigDecimal amount = resolveAmount(request, booking);
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "There is no outstanding amount for this booking");
@@ -67,6 +72,8 @@ public class PaymentService {
 
         Payment saved = paymentRepository.save(payment);
         Invoice invoice = ensureInvoice(saved, booking);
+        cacheInvalidationService.evictBookings(userId);
+        cacheInvalidationService.evictBookingsForAdmin();
 
         return toResponse(saved, invoice);
     }
@@ -189,7 +196,7 @@ public class PaymentService {
 
     private BigDecimal resolveAmount(PaymentRequest request, Booking booking) {
         if (request.getAmount() != null) {
-            return request.getAmount();
+            return request.getAmount().setScale(2, RoundingMode.HALF_UP);
         }
         BigDecimal paidAmount = paymentRepository.findAllByBookingIdOrderByCreatedAtDesc(booking.getId()).stream()
                 .filter(payment -> payment.getStatus() == PaymentStatus.PAID)
@@ -201,6 +208,79 @@ public class PaymentService {
                 .subtract(paidAmount)
                 .max(BigDecimal.ZERO)
                 .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private void applyPromotionCodeIfPresent(Booking booking, String rawCode) {
+        String code = normalizePromotionCode(rawCode);
+        if (code == null) {
+            return;
+        }
+
+        Promotion promotion = promotionRepository.findFirstByCodeIgnoreCase(code)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion code is invalid"));
+
+        if (booking.getPromotionId() != null) {
+            if (!booking.getPromotionId().equals(promotion.getId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A different promotion is already applied to this booking");
+            }
+            return;
+        }
+
+        validatePromotion(promotion);
+
+        BigDecimal subtotal = normalizeMoney(booking.getBasePrice()).add(normalizeMoney(booking.getAddonPrice()));
+        BigDecimal discountAmount = calculateDiscountAmount(promotion, subtotal);
+        if (discountAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion does not reduce this booking total");
+        }
+
+        booking.setPromotionId(promotion.getId());
+        booking.setDiscountAmount(discountAmount);
+        booking.setTotalPrice(subtotal.subtract(discountAmount).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
+        booking.setUpdatedAt(LocalDateTime.now());
+        bookingRepository.save(booking);
+
+        promotion.setUsesCount((promotion.getUsesCount() != null ? promotion.getUsesCount() : 0) + 1);
+        promotion.setUpdatedAt(LocalDateTime.now());
+        promotionRepository.save(promotion);
+    }
+
+    private void validatePromotion(Promotion promotion) {
+        LocalDateTime now = LocalDateTime.now();
+        if (!Boolean.TRUE.equals(promotion.getIsActive())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion code is not active");
+        }
+        if (promotion.getValidFrom() != null && promotion.getValidFrom().isAfter(now)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion code is not active yet");
+        }
+        if (promotion.getValidUntil() != null && promotion.getValidUntil().isBefore(now)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion code has expired");
+        }
+        if (promotion.getMaxUses() != null && promotion.getUsesCount() != null
+                && promotion.getUsesCount() >= promotion.getMaxUses()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Promotion code has reached its usage limit");
+        }
+    }
+
+    private BigDecimal calculateDiscountAmount(Promotion promotion, BigDecimal subtotal) {
+        BigDecimal discount = switch (promotion.getDiscountType()) {
+            case FIXED -> promotion.getDiscountValue();
+            case PERCENTAGE -> subtotal.multiply(promotion.getDiscountValue())
+                    .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+        };
+        return discount.min(subtotal).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal normalizeMoney(BigDecimal value) {
+        return (value != null ? value : BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private String normalizePromotionCode(String rawCode) {
+        if (rawCode == null) {
+            return null;
+        }
+        String code = rawCode.trim();
+        return code.isEmpty() ? null : code;
     }
 
     private String resolveCurrency(String currency) {
