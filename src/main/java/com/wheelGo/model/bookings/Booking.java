@@ -69,6 +69,9 @@ public class Booking {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    @Column(name = "special_request", columnDefinition = "TEXT")
+    private String specialRequest;
+
     @Column(name = "review_eligible", nullable = false)
     private Boolean reviewEligible = false;
 

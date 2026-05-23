@@ -6,9 +6,11 @@ import com.wheelGo.model.bookings.BookingCreateRequest;
 import com.wheelGo.model.bookings.BookingResponse;
 import com.wheelGo.model.driver_licenses.DriverLicense;
 import com.wheelGo.model.enums.BookingStatus;
+import com.wheelGo.model.enums.PaymentStatus;
 import com.wheelGo.model.enums.VehicleStatus;
 import com.wheelGo.model.maintenance_records.MaintenanceRecord;
 import com.wheelGo.model.locations.Location;
+import com.wheelGo.model.payments.Payment;
 import com.wheelGo.model.user.User;
 import com.wheelGo.model.vehicles.Vehicle;
 import com.wheelGo.repository.AddonRepository;
@@ -251,15 +253,26 @@ class BookingServiceTest {
     void should_confirm_booking_when_status_pending() {
         Booking booking = new Booking();
         booking.setId(UUID.randomUUID());
+        booking.setUserId(userId);
         booking.setVehicleId(vehicleId);
         booking.setStatus(BookingStatus.PENDING);
         booking.setBasePrice(new BigDecimal("100.00"));
         booking.setAddonPrice(BigDecimal.ZERO);
         booking.setDiscountAmount(BigDecimal.ZERO);
+        booking.setTotalPrice(new BigDecimal("100.00"));
+        booking.setStartDate(LocalDate.now().plusDays(2).atStartOfDay());
+        booking.setEndDate(LocalDate.now().plusDays(4).atTime(java.time.LocalTime.MAX));
 
         when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
         when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
         when(bookingRepository.save(booking)).thenReturn(booking);
+        when(paymentRepository.findAllByBookingIdOrderByCreatedAtDesc(booking.getId())).thenReturn(List.of());
+        when(bookingRepository.findAllByVehicleIdAndStatusInAndStartDateLessThanAndEndDateGreaterThanOrderByEndDateAsc(
+                vehicleId,
+                java.util.EnumSet.of(BookingStatus.CONFIRMED, BookingStatus.ACTIVE),
+                booking.getEndDate(),
+                booking.getStartDate()
+        )).thenReturn(List.of());
         when(maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicleId)).thenReturn(List.of());
         when(bookingRepository.findAllByVehicleIdAndStatusInOrderByEndDateAsc(vehicleId, java.util.EnumSet.of(BookingStatus.CONFIRMED, BookingStatus.ACTIVE))).thenReturn(List.of());
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
@@ -271,5 +284,37 @@ class BookingServiceTest {
         var result = bookingService.confirmBooking(booking.getId(), new BookingAdminDecisionRequest());
 
         assertThat(result.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+    }
+
+    @Test
+    void should_cancel_booking_for_owner_when_pending() {
+        Booking booking = new Booking();
+        booking.setId(UUID.randomUUID());
+        booking.setUserId(userId);
+        booking.setVehicleId(vehicleId);
+        booking.setStatus(BookingStatus.PENDING);
+
+        Payment pendingPayment = new Payment();
+        pendingPayment.setId(UUID.randomUUID());
+        pendingPayment.setBookingId(booking.getId());
+        pendingPayment.setStatus(PaymentStatus.PENDING);
+
+        when(bookingRepository.findAllByStatusInAndEndDateBefore(any(), any())).thenReturn(List.of());
+        when(bookingRepository.findById(booking.getId())).thenReturn(Optional.of(booking));
+        when(paymentRepository.findAllByBookingIdOrderByCreatedAtDesc(booking.getId())).thenReturn(List.of(pendingPayment));
+        when(bookingRepository.save(booking)).thenReturn(booking);
+        when(maintenanceRecordRepository.findAllByVehicle_IdOrderByPerformedAtDescCreatedAtDesc(vehicleId)).thenReturn(List.of());
+        when(bookingRepository.findAllByVehicleIdAndStatusInOrderByEndDateAsc(vehicleId, java.util.EnumSet.of(BookingStatus.CONFIRMED, BookingStatus.ACTIVE))).thenReturn(List.of());
+        when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findAllById(any())).thenReturn(List.of(vehicle));
+        when(userRepository.findAllById(any())).thenReturn(List.of(user));
+        when(bookingAddonRepository.findByBookingIdIn(any())).thenReturn(List.of());
+        when(vehicleImageRepository.findByVehicleIdInOrderByUploadedAtDesc(any())).thenReturn(List.of());
+
+        BookingResponse result = bookingService.cancelBooking(userId, booking.getId());
+
+        assertThat(result.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+        assertThat(pendingPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        verify(paymentRepository).saveAll(any());
     }
 }

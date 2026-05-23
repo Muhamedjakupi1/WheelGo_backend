@@ -13,6 +13,7 @@ import java.util.UUID;
 public interface BookingRepository extends JpaRepository<Booking, UUID> {
     List<Booking> findAllByUserIdOrderByCreatedAtDesc(UUID userId);
     List<Booking> findAllByOrderByCreatedAtDesc();
+    long countByUserIdAndStatus(UUID userId, BookingStatus status);
     List<Booking> findAllByStatusInAndEndDateBefore(Collection<BookingStatus> statuses, LocalDateTime dateTime);
     @Query("""
             SELECT b

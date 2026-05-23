@@ -8,6 +8,7 @@ import com.wheelGo.model.enums.PaymentStatus;
 import com.wheelGo.model.invoices.Invoice;
 import com.wheelGo.model.invoices.InvoiceEmailRequest;
 import com.wheelGo.model.payments.Payment;
+import com.wheelGo.model.payments.PaymentAdminUpdateRequest;
 import com.wheelGo.model.payments.PaymentRequest;
 import com.wheelGo.model.payments.PaymentResponse;
 import com.wheelGo.model.promotions.Promotion;
@@ -45,6 +46,7 @@ public class PaymentService {
     private final FileStorageService fileStorageService;
     private final PromotionRepository promotionRepository;
     private final CacheInvalidationService cacheInvalidationService;
+    private final BookingService bookingService;
 
     @Transactional
     public PaymentResponse payForBooking(UUID userId, PaymentRequest request) {
@@ -53,28 +55,26 @@ public class PaymentService {
         }
 
         Booking booking = getUserBooking(userId, request.getBookingId());
+        validatePayableBooking(booking);
         applyPromotionCodeIfPresent(booking, request.getPromotionCode());
         BigDecimal amount = resolveAmount(request, booking);
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "There is no outstanding amount for this booking");
         }
 
-        Payment payment = new Payment();
-        payment.setBookingId(booking.getId());
-        payment.setAmount(amount);
-        payment.setCurrency(resolveCurrency(request.getCurrency()));
-        payment.setMethod(resolveMethod(request.getMethod()));
-        payment.setGatewayRef(request.getGatewayRef());
-        payment.setStatus(resolveInitialStatus(request, payment.getMethod()));
-        payment.setPaidAt(resolvePaidAt(request, payment.getStatus()));
-        payment.setCreatedAt(LocalDateTime.now());
-        payment.setUpdatedAt(LocalDateTime.now());
+        PaymentMethod method = resolveMethod(request.getMethod());
+        if (hasSpecialRequest(booking) && method == PaymentMethod.CARD) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Bookings with a special request can only be paid in cash after admin review."
+            );
+        }
 
-        Payment saved = paymentRepository.save(payment);
+        Payment saved = method == PaymentMethod.CASH
+                ? createOrRefreshCashPayment(booking, request, amount)
+                : createCardPaymentAndAutoConfirm(booking, request, amount);
         Invoice invoice = ensureInvoice(saved, booking);
-        cacheInvalidationService.evictBookings(userId);
-        cacheInvalidationService.evictBookingsForAdmin();
-
+        evictBookingAndPaymentCaches(booking);
         return toResponse(saved, invoice);
     }
 
@@ -134,25 +134,12 @@ public class PaymentService {
     @Transactional
     public PaymentResponse confirmCashPayment(UUID id) {
         Payment payment = getPayment(id);
-
         if (payment.getMethod() != PaymentMethod.CASH) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only cash payments can be confirmed");
         }
-
-        if (payment.getStatus() == PaymentStatus.REFUNDED) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refunded payments cannot be confirmed");
-        }
-
-        payment.setStatus(PaymentStatus.PAID);
-        payment.setPaidAt(LocalDateTime.now());
-        payment.setUpdatedAt(LocalDateTime.now());
-
-        Payment saved = paymentRepository.save(payment);
-        Booking booking = bookingRepository.findById(saved.getBookingId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
-        Invoice invoice = ensureInvoice(saved, booking);
-
-        return toResponse(saved, invoice);
+        PaymentAdminUpdateRequest request = new PaymentAdminUpdateRequest();
+        request.setStatus(PaymentStatus.PAID);
+        return updatePaymentStatus(id, request);
     }
 
     @Transactional
@@ -175,12 +162,50 @@ public class PaymentService {
 
         Payment saved = paymentRepository.save(payment);
         Invoice invoice = invoiceRepository.findByBookingId(saved.getBookingId()).orElse(null);
+        evictBookingAndPaymentCaches(booking);
+        return toResponse(saved, invoice);
+    }
+
+    @Transactional
+    public PaymentResponse updatePaymentStatus(UUID id, PaymentAdminUpdateRequest request) {
+        Payment payment = getPayment(id);
+        Booking booking = bookingRepository.findById(payment.getBookingId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found"));
+
+        PaymentStatus targetStatus = request.getStatus();
+        if (targetStatus == PaymentStatus.REFUNDED
+                && booking.getStatus() != BookingStatus.CANCELLED
+                && booking.getStatus() != BookingStatus.COMPLETED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only cancelled or completed bookings can be refunded");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        payment.setStatus(targetStatus);
+        payment.setUpdatedAt(now);
+        if (targetStatus == PaymentStatus.PAID) {
+            payment.setPaidAt(now);
+        } else if (targetStatus == PaymentStatus.PENDING || targetStatus == PaymentStatus.FAILED) {
+            payment.setPaidAt(null);
+        }
+
+        Payment saved = paymentRepository.save(payment);
+        Invoice invoice = ensureInvoice(saved, booking);
+        evictBookingAndPaymentCaches(booking);
         return toResponse(saved, invoice);
     }
 
     private Payment getPayment(UUID id) {
         return paymentRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Payment not found"));
+    }
+
+    private void validatePayableBooking(Booking booking) {
+        if (booking.getStatus() == BookingStatus.CANCELLED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cancelled bookings cannot be paid");
+        }
+        if (booking.getStatus() == BookingStatus.COMPLETED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Completed bookings cannot be paid");
+        }
     }
 
     private Booking getUserBooking(UUID userId, UUID bookingId) {
@@ -294,18 +319,96 @@ public class PaymentService {
         return method != null ? method : PaymentMethod.CARD;
     }
 
-    private PaymentStatus resolveInitialStatus(PaymentRequest request, PaymentMethod method) {
-        if (request.getStatus() != null) {
-            return request.getStatus();
+    private Payment createOrRefreshCashPayment(Booking booking, PaymentRequest request, BigDecimal amount) {
+        Payment existingPendingPayment = paymentRepository.findAllByBookingIdOrderByCreatedAtDesc(booking.getId()).stream()
+                .filter(payment -> payment.getStatus() == PaymentStatus.PENDING)
+                .findFirst()
+                .orElse(null);
+
+        if (existingPendingPayment != null) {
+            existingPendingPayment.setAmount(amount);
+            existingPendingPayment.setCurrency(resolveCurrency(request.getCurrency()));
+            existingPendingPayment.setMethod(PaymentMethod.CASH);
+            existingPendingPayment.setGatewayRef(request.getGatewayRef());
+            existingPendingPayment.setUpdatedAt(LocalDateTime.now());
+            return paymentRepository.save(existingPendingPayment);
         }
-        return method == PaymentMethod.CASH ? PaymentStatus.PENDING : PaymentStatus.PAID;
+
+        Payment payment = new Payment();
+        payment.setBookingId(booking.getId());
+        payment.setAmount(amount);
+        payment.setCurrency(resolveCurrency(request.getCurrency()));
+        payment.setMethod(PaymentMethod.CASH);
+        payment.setGatewayRef(request.getGatewayRef());
+        payment.setStatus(PaymentStatus.PENDING);
+        payment.setPaidAt(null);
+        payment.setCreatedAt(LocalDateTime.now());
+        payment.setUpdatedAt(LocalDateTime.now());
+        return paymentRepository.save(payment);
     }
 
-    private LocalDateTime resolvePaidAt(PaymentRequest request, PaymentStatus status) {
-        if (request.getPaidAt() != null) {
-            return request.getPaidAt();
+    private Payment createCardPaymentAndAutoConfirm(Booking booking, PaymentRequest request, BigDecimal amount) {
+        if (booking.getStatus() != BookingStatus.PENDING && booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only pending or confirmed bookings can be paid by card");
         }
-        return status == PaymentStatus.PAID ? LocalDateTime.now() : null;
+        if (bookingRepository.existsByVehicleIdAndStatusInAndStartDateLessThanAndEndDateGreaterThanAndIdNot(
+                booking.getVehicleId(),
+                java.util.EnumSet.of(BookingStatus.CONFIRMED, BookingStatus.ACTIVE),
+                booking.getEndDate(),
+                booking.getStartDate(),
+                booking.getId()
+        )) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "This vehicle already has a confirmed booking for the selected dates."
+            );
+        }
+
+        booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setUpdatedAt(LocalDateTime.now());
+        bookingRepository.save(booking);
+
+        Payment payment = new Payment();
+        payment.setBookingId(booking.getId());
+        payment.setAmount(amount);
+        payment.setCurrency(resolveCurrency(request.getCurrency()));
+        payment.setMethod(PaymentMethod.CARD);
+        payment.setGatewayRef(request.getGatewayRef());
+        payment.setStatus(PaymentStatus.PAID);
+        payment.setPaidAt(LocalDateTime.now());
+        payment.setCreatedAt(LocalDateTime.now());
+        payment.setUpdatedAt(LocalDateTime.now());
+
+        Payment saved = paymentRepository.save(payment);
+        expireOtherPendingPayments(booking.getId());
+        bookingService.cancelPendingOverlappingBookings(booking.getId());
+        return saved;
+    }
+
+    private void expireOtherPendingPayments(UUID bookingId) {
+        List<Payment> pendingPayments = paymentRepository.findAllByBookingIdOrderByCreatedAtDesc(bookingId).stream()
+                .filter(payment -> payment.getStatus() == PaymentStatus.PENDING)
+                .toList();
+        if (pendingPayments.isEmpty()) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        pendingPayments.forEach(payment -> {
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setUpdatedAt(now);
+        });
+        paymentRepository.saveAll(pendingPayments);
+    }
+
+    private boolean hasSpecialRequest(Booking booking) {
+        return booking.getSpecialRequest() != null && !booking.getSpecialRequest().isBlank();
+    }
+
+    private void evictBookingAndPaymentCaches(Booking booking) {
+        cacheInvalidationService.evictBookings(booking.getUserId());
+        cacheInvalidationService.evictBookingsForAdmin();
+        cacheInvalidationService.evictVehicle(booking.getVehicleId());
     }
 
     private Invoice ensureInvoice(Payment payment, Booking booking) {

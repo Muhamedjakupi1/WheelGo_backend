@@ -21,6 +21,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -96,6 +97,24 @@ class BookingControllerTest {
             mockMvc.perform(get("/api/v1/bookings/me").with(user("user").roles("USER")))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$[0].vehicleName").value("Audi A4"));
+        }
+    }
+
+    @Test
+    void should_return_ok_when_cancel_my_booking() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        BookingResponse response = new BookingResponse();
+        response.setId(bookingId);
+
+        when(bookingService.cancelBooking(userId, bookingId)).thenReturn(response);
+
+        try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
+            mockedSecurityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(userId);
+
+            mockMvc.perform(patch("/api/v1/bookings/{id}/cancel", bookingId).with(user("user").roles("USER")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(bookingId.toString()));
         }
     }
 

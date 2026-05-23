@@ -3,6 +3,7 @@ package com.wheelGo.model.user_profiles;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Getter @Setter
@@ -18,5 +19,8 @@ public class UserProfileResponse {
     private String    address;
     private String    city;
     private String    country;
+    private Long      totalRides;
+    private LocalDateTime memberSince;
+    private Double    averageRating;
 
 }
