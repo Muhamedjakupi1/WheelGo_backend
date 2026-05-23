@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api/driver-license")
@@ -51,13 +52,14 @@ public class DriverLicenseController {
     }
 
     @PostMapping(value = "/me/verify", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<DriverLicenseVerificationResponse> verifyMyLicense(@RequestBody(required = false) DriverLicenseUpdateRequest request) {
+    public CompletableFuture<ResponseEntity<DriverLicenseVerificationResponse>> verifyMyLicense(@RequestBody(required = false) DriverLicenseUpdateRequest request) {
         UUID userId = SecurityUtils.getCurrentUserId();
-        return ResponseEntity.ok(driverLicenseService.verifyMyLicense(userId, request));
+        return driverLicenseService.verifyMyLicense(userId, request)
+                .thenApply(ResponseEntity::ok);
     }
 
     @PostMapping(value = "/me/verify", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<DriverLicenseVerificationResponse> verifyMyLicenseWithImages(
+    public CompletableFuture<ResponseEntity<DriverLicenseVerificationResponse>> verifyMyLicenseWithImages(
             @RequestParam String licenseNumber,
             @RequestParam String issuingCountry,
             @RequestParam String expiryDate,
@@ -69,6 +71,7 @@ public class DriverLicenseController {
         request.setLicenseNumber(licenseNumber);
         request.setIssuingCountry(issuingCountry);
         request.setExpiryDate(java.time.LocalDate.parse(expiryDate));
-        return ResponseEntity.ok(driverLicenseService.verifyMyLicense(userId, request, frontImage, backImage));
+        return driverLicenseService.verifyMyLicense(userId, request, frontImage, backImage)
+                .thenApply(ResponseEntity::ok);
     }
 }

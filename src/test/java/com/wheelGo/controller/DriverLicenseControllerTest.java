@@ -16,12 +16,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -86,12 +88,13 @@ class DriverLicenseControllerTest {
         UUID userId = UUID.randomUUID();
         DriverLicenseVerificationResponse response = new DriverLicenseVerificationResponse();
         response.setVerified(true);
-        when(driverLicenseService.verifyMyLicense(eq(userId), any())).thenReturn(response);
+        when(driverLicenseService.verifyMyLicense(eq(userId), any()))
+                .thenReturn(CompletableFuture.completedFuture(response));
 
         try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
             mockedSecurityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(userId);
 
-            mockMvc.perform(post("/api/driver-license/me/verify")
+            var mvcResult = mockMvc.perform(post("/api/driver-license/me/verify")
                             .with(user("user").roles("USER"))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
@@ -101,6 +104,11 @@ class DriverLicenseControllerTest {
                                       "expiryDate":"2028-01-01"
                                     }
                                     """))
+                    .andExpect(status().isOk())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.request().asyncStarted())
+                    .andReturn();
+
+            mockMvc.perform(asyncDispatch(mvcResult))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.verified").value(true));
         }
