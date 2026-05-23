@@ -18,5 +18,6 @@ public class PaymentRequest {
     private PaymentMethod method;
     private PaymentStatus status;
     private String gatewayRef;
+    private String promotionCode;
     private LocalDateTime paidAt;
 }
