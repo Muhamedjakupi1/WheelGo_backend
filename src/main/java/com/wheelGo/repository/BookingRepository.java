@@ -14,6 +14,14 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     List<Booking> findAllByUserIdOrderByCreatedAtDesc(UUID userId);
     List<Booking> findAllByOrderByCreatedAtDesc();
     List<Booking> findAllByStatusInAndEndDateBefore(Collection<BookingStatus> statuses, LocalDateTime dateTime);
+    @Query("""
+            SELECT b
+            FROM Booking b
+            WHERE b.status = :status
+              AND b.reviewSubmittedAt IS NULL
+              AND (b.reviewEligible = false OR b.reviewEligible IS NULL)
+            """)
+    List<Booking> findAllReviewEligibilityCandidates(BookingStatus status);
     List<Booking> findAllByVehicleIdAndStatusInOrderByEndDateAsc(
             UUID vehicleId,
             Collection<BookingStatus> statuses

@@ -12,6 +12,8 @@ public class ReviewResponse {
     private UUID bookingId;
     private UUID userId;
     private UUID vehicleId;
+    private String customerEmail;
+    private String vehicleName;
     private int rating;
     private String comment;
     private LocalDateTime createdAt;
