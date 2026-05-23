@@ -1,12 +1,15 @@
 package com.wheelGo.service;
 
 import com.wheelGo.mapper.UserProfileMapper;
+import com.wheelGo.model.enums.BookingStatus;
 import com.wheelGo.model.tenant.Tenant;
 import com.wheelGo.model.user.User;
 import com.wheelGo.model.user_profiles.UserProfile;
 import com.wheelGo.model.user_profiles.UserProfileRequest;
 import com.wheelGo.model.user_profiles.UserProfileResponse;
 import com.wheelGo.model.user_profiles.UserProfileUpdateRequest;
+import com.wheelGo.repository.BookingRepository;
+import com.wheelGo.repository.ReviewRepository;
 import com.wheelGo.repository.UserProfileRepository;
 import com.wheelGo.repository.UserRepository;
 import com.wheelGo.security.CustomUserPrincipal;
@@ -36,6 +39,8 @@ class UserProfileServiceTest {
 
     @Mock private UserProfileRepository userProfileRepository;
     @Mock private UserRepository userRepository;
+    @Mock private BookingRepository bookingRepository;
+    @Mock private ReviewRepository reviewRepository;
     @Mock private UserProfileMapper userProfileMapper;
     @Mock private FileStorageService fileStorageService;
     @InjectMocks private UserProfileService userProfileService;
@@ -63,6 +68,7 @@ class UserProfileServiceTest {
         response = new UserProfileResponse();
         response.setId(profile.getId());
         response.setFirstName("John");
+        response.setUserId(userId);
 
         CustomUserPrincipal principal = new CustomUserPrincipal(
                 userId,
@@ -96,10 +102,15 @@ class UserProfileServiceTest {
         when(userProfileRepository.findByUser_Id(userId)).thenReturn(Optional.empty());
         when(userProfileRepository.save(any(UserProfile.class))).thenReturn(profile);
         when(userProfileMapper.toResponse(profile)).thenReturn(response);
+        when(bookingRepository.countByUserIdAndStatus(userId, BookingStatus.COMPLETED)).thenReturn(3L);
+        when(reviewRepository.findAverageRatingByUserId(userId)).thenReturn(4.5);
 
         UserProfileResponse result = userProfileService.createProfile(userId, request);
 
         assertThat(result.getFirstName()).isEqualTo("John");
+        assertThat(result.getTotalRides()).isEqualTo(3L);
+        assertThat(result.getAverageRating()).isEqualTo(4.5);
+        assertThat(result.getMemberSince()).isEqualTo(user.getCreatedAt());
     }
 
     @Test
@@ -125,10 +136,15 @@ class UserProfileServiceTest {
     void should_return_existing_profile_when_get_profile_by_user_id_found() {
         when(userProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(profile));
         when(userProfileMapper.toResponse(profile)).thenReturn(response);
+        when(bookingRepository.countByUserIdAndStatus(userId, BookingStatus.COMPLETED)).thenReturn(1L);
+        when(reviewRepository.findAverageRatingByUserId(userId)).thenReturn(null);
 
         UserProfileResponse result = userProfileService.getProfileByUserId(userId);
 
         assertThat(result.getId()).isEqualTo(profile.getId());
+        assertThat(result.getTotalRides()).isEqualTo(1L);
+        assertThat(result.getAverageRating()).isNull();
+        assertThat(result.getMemberSince()).isEqualTo(user.getCreatedAt());
     }
 
     @Test
@@ -137,10 +153,15 @@ class UserProfileServiceTest {
         when(userRepository.findByIdAndTenantId(userId, user.getTenant().getId())).thenReturn(Optional.of(user));
         when(userProfileRepository.save(any(UserProfile.class))).thenReturn(profile);
         when(userProfileMapper.toResponse(profile)).thenReturn(response);
+        when(bookingRepository.countByUserIdAndStatus(userId, BookingStatus.COMPLETED)).thenReturn(0L);
+        when(reviewRepository.findAverageRatingByUserId(userId)).thenReturn(null);
 
         UserProfileResponse result = userProfileService.getProfileByUserId(userId);
 
         assertThat(result.getFirstName()).isEqualTo("John");
+        assertThat(result.getTotalRides()).isZero();
+        assertThat(result.getAverageRating()).isNull();
+        assertThat(result.getMemberSince()).isEqualTo(user.getCreatedAt());
     }
 
     @Test
@@ -152,11 +173,16 @@ class UserProfileServiceTest {
         when(userProfileRepository.findByUser_Id(userId)).thenReturn(Optional.of(profile));
         when(userProfileRepository.save(profile)).thenReturn(profile);
         when(userProfileMapper.toResponse(profile)).thenReturn(response);
+        when(userRepository.findByIdAndTenantId(userId, user.getTenant().getId())).thenReturn(Optional.of(user));
+        when(bookingRepository.countByUserIdAndStatus(userId, BookingStatus.COMPLETED)).thenReturn(2L);
+        when(reviewRepository.findAverageRatingByUserId(userId)).thenReturn(5.0);
 
-        userProfileService.updateProfile(userId, request);
+        UserProfileResponse result = userProfileService.updateProfile(userId, request);
 
         assertThat(profile.getPhone()).isEqualTo("123");
         assertThat(profile.getCity()).isNull();
+        assertThat(result.getTotalRides()).isEqualTo(2L);
+        assertThat(result.getAverageRating()).isEqualTo(5.0);
     }
 
     @Test
@@ -175,11 +201,16 @@ class UserProfileServiceTest {
         when(fileStorageService.storeProfileAvatar(file)).thenReturn("/uploads/avatar.png");
         when(userProfileRepository.save(profile)).thenReturn(profile);
         when(userProfileMapper.toResponse(profile)).thenReturn(response);
+        when(userRepository.findByIdAndTenantId(userId, user.getTenant().getId())).thenReturn(Optional.of(user));
+        when(bookingRepository.countByUserIdAndStatus(userId, BookingStatus.COMPLETED)).thenReturn(7L);
+        when(reviewRepository.findAverageRatingByUserId(userId)).thenReturn(3.5);
 
         UserProfileResponse result = userProfileService.uploadAvatar(userId, file);
 
         assertThat(profile.getAvatarUrl()).isEqualTo("/uploads/avatar.png");
         assertThat(result.getId()).isEqualTo(profile.getId());
+        assertThat(result.getTotalRides()).isEqualTo(7L);
+        assertThat(result.getAverageRating()).isEqualTo(3.5);
     }
 
     @Test

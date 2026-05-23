@@ -1,11 +1,14 @@
 package com.wheelGo.service;
 
 import com.wheelGo.mapper.UserProfileMapper;
+import com.wheelGo.model.enums.BookingStatus;
 import com.wheelGo.model.user.User;
 import com.wheelGo.model.user_profiles.UserProfile;
 import com.wheelGo.model.user_profiles.UserProfileRequest;
 import com.wheelGo.model.user_profiles.UserProfileResponse;
 import com.wheelGo.model.user_profiles.UserProfileUpdateRequest;
+import com.wheelGo.repository.BookingRepository;
+import com.wheelGo.repository.ReviewRepository;
 import com.wheelGo.repository.UserProfileRepository;
 import com.wheelGo.repository.UserRepository;
 import com.wheelGo.tools.SecurityUtils;
@@ -24,6 +27,8 @@ import java.util.UUID;
 public class UserProfileService {
     private final UserProfileRepository userProfileRepository;
     private final UserRepository userRepository;
+    private final BookingRepository bookingRepository;
+    private final ReviewRepository reviewRepository;
     private final UserProfileMapper userProfileMapper;
     private final FileStorageService fileStorageService;
 
@@ -47,14 +52,15 @@ public class UserProfileService {
         profile.setCountry(request.getCountry());
 
         UserProfile savedProfile = userProfileRepository.save(profile);
-        return userProfileMapper.toResponse(savedProfile);
+        return enrichProfileResponse(userProfileMapper.toResponse(savedProfile), user);
     }
 
     @Transactional
     public UserProfileResponse getProfileByUserId(UUID userId) {
+        User user = findCurrentUser(userId);
         UserProfile profile = userProfileRepository.findByUser_Id(userId)
                 .orElseGet(() -> createDefaultProfile(userId));
-        return userProfileMapper.toResponse(profile);
+        return enrichProfileResponse(userProfileMapper.toResponse(profile), user);
     }
 
     @Transactional
@@ -90,7 +96,8 @@ public class UserProfileService {
         profile.setUpdatedAt(LocalDateTime.now());
 
         UserProfile updatedProfile = userProfileRepository.save(profile);
-        return userProfileMapper.toResponse(updatedProfile);
+        User user = findCurrentUser(userId);
+        return enrichProfileResponse(userProfileMapper.toResponse(updatedProfile), user);
     }
 
     @Transactional
@@ -103,7 +110,8 @@ public class UserProfileService {
         profile.setUpdatedAt(LocalDateTime.now());
 
         UserProfile updatedProfile = userProfileRepository.save(profile);
-        return userProfileMapper.toResponse(updatedProfile);
+        User user = findCurrentUser(userId);
+        return enrichProfileResponse(userProfileMapper.toResponse(updatedProfile), user);
     }
 
     private String normalizeOptionalText(String value) {
@@ -124,6 +132,13 @@ public class UserProfileService {
         profile.setLastName("User");
 
         return userProfileRepository.save(profile);
+    }
+
+    private UserProfileResponse enrichProfileResponse(UserProfileResponse response, User user) {
+        response.setTotalRides(bookingRepository.countByUserIdAndStatus(user.getId(), BookingStatus.COMPLETED));
+        response.setMemberSince(user.getCreatedAt());
+        response.setAverageRating(reviewRepository.findAverageRatingByUserId(user.getId()));
+        return response;
     }
 
     private User findCurrentUser(UUID userId) {
