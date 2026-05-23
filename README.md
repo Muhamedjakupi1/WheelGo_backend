@@ -18,7 +18,7 @@ The project was developed in phases:
 6. Multi-tenancy was added by separating tenant-owned data into PostgreSQL schemas.
 7. Admin and user workflows were added for vehicles, bookings, payments, invoices, reviews, maintenance, and support.
 8. Redis caching was added for frequently used data such as tenants, vehicles, users, and bookings.
-9. Background jobs were added for invoice emails, booking status cleanup, add-on inventory release, and review eligibility.
+9. Background and external processing flows were added for invoice emails, driver license AI verification with Ollama, booking status cleanup, add-on inventory release, and review eligibility.
 10. Swagger/OpenAPI documentation and automated tests were added to make the API easier to inspect and verify.
 
 ## Technology Stack
@@ -60,7 +60,7 @@ The class requirements are covered as follows:
 | Git collaboration | Work should be done through branches and pull requests. |
 | AI / LLM integration | Driver license verification uses an LLM vision service through the Ollama API. The same module can be adapted to OpenAI if required by deployment. |
 | Caching | Redis caching is configured through Spring Cache. |
-| Async/background jobs | Invoice email sending uses `@Async`; scheduled jobs manage booking and inventory state. |
+| Async/background jobs | Invoice email sending uses `@Async`; driver license verification calls an external LLM/Ollama service; scheduled jobs manage booking and inventory state. |
 | Multi-tenancy | Each tenant has its own PostgreSQL schema; public data stores tenants and users. |
 | Search and filtering | Vehicles, bookings, payments, users, maintenance, and admin lists support keyword filtering/search patterns. |
 
@@ -301,6 +301,8 @@ The verification process:
 6. The backend stores whether the license is verified.
 7. Booking creation is blocked until the license is verified and not expired.
 
+This is also treated as an asynchronous-style backend process because the API delegates the heavy document analysis to an external LLM service instead of doing the full verification locally inside the database transaction logic. The backend prepares the image payloads, sends them to Ollama, waits for the structured result, and then updates the driver's license verification state.
+
 Current implementation uses an Ollama-compatible local API:
 
 ```properties
@@ -425,6 +427,7 @@ Services evict cache entries when data changes. For example, when a booking is c
 The backend uses asynchronous and scheduled work:
 
 - `InvoiceEmailJobService` sends invoice emails asynchronously with `@Async`.
+- Driver license verification sends uploaded front/back license images to the Ollama LLM vision endpoint and stores the AI result as the user's verification state.
 - `BookingService` periodically releases finished add-on inventory.
 - `BookingService` periodically marks completed bookings as review eligible.
 - Booking status and vehicle status are synchronized automatically.
