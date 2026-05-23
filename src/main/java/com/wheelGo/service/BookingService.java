@@ -155,7 +155,8 @@ public class BookingService {
         booking.setAddonPrice(addonPrice);
         booking.setTotalPrice(totalPrice);
         booking.setStatus(BookingStatus.PENDING);
-        booking.setNotes(normalizeOptionalText(request.getSpecialRequest()));
+        booking.setNotes(null);
+        booking.setSpecialRequest(normalizeOptionalText(request.getSpecialRequest()));
         booking.setCreatedAt(LocalDateTime.now());
         booking.setUpdatedAt(LocalDateTime.now());
 
@@ -257,6 +258,31 @@ public class BookingService {
             @CacheEvict(value = CacheNames.BOOKINGS, key = "'user:' + #result.userId"),
             @CacheEvict(value = CacheNames.BOOKINGS, key = "'admin:all:' + @tenantCacheKeyService.currentTenantScope()")
     })
+    public BookingResponse cancelBooking(UUID userId, UUID bookingId) {
+        releaseFinishedAddonInventory();
+        Booking booking = findBooking(bookingId);
+        if (!booking.getUserId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot cancel this booking");
+        }
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only pending bookings can be cancelled");
+        }
+
+        releaseBookingAddonInventory(booking);
+        failPendingPaymentsForBooking(booking.getId());
+        booking.setStatus(BookingStatus.CANCELLED);
+        booking.setUpdatedAt(LocalDateTime.now());
+        Booking savedBooking = bookingRepository.save(booking);
+        syncVehicleStatus(savedBooking.getVehicleId());
+        cacheInvalidationService.evictVehicle(savedBooking.getVehicleId());
+        return toResponseWithDetails(savedBooking);
+    }
+
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = CacheNames.BOOKINGS, key = "'user:' + #result.userId"),
+            @CacheEvict(value = CacheNames.BOOKINGS, key = "'admin:all:' + @tenantCacheKeyService.currentTenantScope()")
+    })
     public BookingResponse confirmBooking(UUID bookingId, BookingAdminDecisionRequest request) {
         releaseFinishedAddonInventory();
         Booking booking = findBooking(bookingId);
@@ -266,19 +292,13 @@ public class BookingService {
 
         BigDecimal approvedCharge = normalizeMoney(request != null ? request.getAddonCharge() : null);
         if (approvedCharge.compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal addonPrice = normalizeMoney(booking.getAddonPrice()).add(approvedCharge);
-            booking.setAddonPrice(addonPrice);
-            booking.setTotalPrice(
-                    normalizeMoney(booking.getBasePrice())
-                            .add(addonPrice)
-                            .subtract(normalizeMoney(booking.getDiscountAmount()))
-                            .setScale(2, RoundingMode.HALF_UP)
-            );
-            appendApprovedChargeNote(booking, request != null ? request.getAddonName() : null, approvedCharge);
+            applyApprovedCharge(booking, request != null ? request.getAddonName() : null, approvedCharge);
         }
 
+        ensureVehicleDatesAvailable(booking.getVehicleId(), booking.getStartDate(), booking.getEndDate(), booking.getId());
         booking.setStatus(BookingStatus.CONFIRMED);
         booking.setUpdatedAt(LocalDateTime.now());
+        reconcilePendingPaymentsForBooking(booking);
         Booking savedBooking = bookingRepository.save(booking);
         syncVehicleStatus(savedBooking.getVehicleId());
         cacheInvalidationService.evictVehicle(savedBooking.getVehicleId());
@@ -302,6 +322,7 @@ public class BookingService {
             booking.setNotes(appendNote(booking.getNotes(), "Admin rejection note: " + note));
         }
         releaseBookingAddonInventory(booking);
+        failPendingPaymentsForBooking(booking.getId());
         booking.setStatus(BookingStatus.CANCELLED);
         booking.setUpdatedAt(LocalDateTime.now());
         Booking savedBooking = bookingRepository.save(booking);
@@ -334,15 +355,7 @@ public class BookingService {
         boolean shouldReleaseInventory = wasInventoryReserved && isTerminalStatus(targetStatus);
 
         if (request.getAddonCharge() != null && request.getAddonCharge().compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal addonPrice = normalizeMoney(booking.getAddonPrice()).add(normalizeMoney(request.getAddonCharge()));
-            booking.setAddonPrice(addonPrice);
-            booking.setTotalPrice(
-                    normalizeMoney(booking.getBasePrice())
-                            .add(addonPrice)
-                            .subtract(normalizeMoney(booking.getDiscountAmount()))
-                            .setScale(2, RoundingMode.HALF_UP)
-            );
-            appendApprovedChargeNote(booking, request.getAddonName(), normalizeMoney(request.getAddonCharge()));
+            applyApprovedCharge(booking, request.getAddonName(), normalizeMoney(request.getAddonCharge()));
         }
 
         String note = normalizeOptionalText(request.getNote());
@@ -352,11 +365,13 @@ public class BookingService {
 
         if (shouldReleaseInventory) {
             releaseBookingAddonInventory(booking);
+            failPendingPaymentsForBooking(booking.getId());
         }
 
         booking.setStatus(targetStatus);
         applyReviewEligibilityForStatus(booking, targetStatus);
         booking.setUpdatedAt(LocalDateTime.now());
+        reconcilePendingPaymentsForBooking(booking);
         Booking savedBooking = bookingRepository.save(booking);
         syncVehicleStatus(savedBooking.getVehicleId());
         cacheInvalidationService.evictVehicle(savedBooking.getVehicleId());
@@ -370,6 +385,7 @@ public class BookingService {
         if (RELEASABLE_STATUSES.contains(booking.getStatus())) {
             releaseBookingAddonInventory(booking);
         }
+        failPendingPaymentsForBooking(booking.getId());
         UUID vehicleId = booking.getVehicleId();
         UUID userId = booking.getUserId();
         bookingRepository.delete(booking);
@@ -377,6 +393,41 @@ public class BookingService {
         cacheInvalidationService.evictBookings(userId);
         cacheInvalidationService.evictBookingsForAdmin();
         cacheInvalidationService.evictVehicle(vehicleId);
+    }
+
+    @Transactional
+    public void cancelPendingOverlappingBookings(UUID confirmedBookingId) {
+        Booking confirmedBooking = findBooking(confirmedBookingId);
+        List<Booking> overlappingPendingBookings = bookingRepository
+                .findAllByVehicleIdAndStatusInAndStartDateLessThanAndEndDateGreaterThanOrderByEndDateAsc(
+                        confirmedBooking.getVehicleId(),
+                        EnumSet.of(BookingStatus.PENDING),
+                        confirmedBooking.getEndDate(),
+                        confirmedBooking.getStartDate()
+                ).stream()
+                .filter(booking -> !booking.getId().equals(confirmedBooking.getId()))
+                .toList();
+
+        if (overlappingPendingBookings.isEmpty()) {
+            return;
+        }
+
+        overlappingPendingBookings.forEach(booking -> {
+            releaseBookingAddonInventory(booking);
+            failPendingPaymentsForBooking(booking.getId());
+            booking.setStatus(BookingStatus.CANCELLED);
+            booking.setNotes(appendNote(booking.getNotes(), "Cancelled automatically because another booking was confirmed for the same vehicle and dates."));
+            booking.setUpdatedAt(LocalDateTime.now());
+        });
+        bookingRepository.saveAll(overlappingPendingBookings);
+
+        overlappingPendingBookings.stream()
+                .map(Booking::getUserId)
+                .distinct()
+                .forEach(cacheInvalidationService::evictBookingsForUser);
+        cacheInvalidationService.evictBookingsForAdmin();
+        cacheInvalidationService.evictVehicle(confirmedBooking.getVehicleId());
+        syncVehicleStatus(confirmedBooking.getVehicleId());
     }
 
     private List<BookingResponse> toResponses(List<Booking> bookings) {
@@ -492,7 +543,7 @@ public class BookingService {
         response.setTotalPrice(booking.getTotalPrice());
         response.setStatus(booking.getStatus());
         response.setNotes(booking.getNotes());
-        response.setSpecialRequest(booking.getNotes());
+        response.setSpecialRequest(booking.getSpecialRequest());
         response.setReviewEligible(booking.getReviewEligible());
         response.setReviewEligibleAt(booking.getReviewEligibleAt());
         response.setReviewSubmittedAt(booking.getReviewSubmittedAt());
@@ -526,6 +577,71 @@ public class BookingService {
 
     private BookingResponse toResponseWithDetails(Booking booking) {
         return toResponses(List.of(booking)).getFirst();
+    }
+
+    private void applyApprovedCharge(Booking booking, String addonName, BigDecimal charge) {
+        BigDecimal addonPrice = normalizeMoney(booking.getAddonPrice()).add(charge);
+        booking.setAddonPrice(addonPrice);
+        booking.setTotalPrice(
+                normalizeMoney(booking.getBasePrice())
+                        .add(addonPrice)
+                        .subtract(normalizeMoney(booking.getDiscountAmount()))
+                        .setScale(2, RoundingMode.HALF_UP)
+        );
+        appendApprovedChargeNote(booking, addonName, charge);
+    }
+
+    private void reconcilePendingPaymentsForBooking(Booking booking) {
+        List<Payment> payments = paymentRepository.findAllByBookingIdOrderByCreatedAtDesc(booking.getId());
+        if (payments.isEmpty()) {
+            return;
+        }
+
+        BigDecimal paidAmount = payments.stream()
+                .filter(payment -> payment.getStatus() == com.wheelGo.model.enums.PaymentStatus.PAID)
+                .map(Payment::getAmount)
+                .map(this::normalizeMoney)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal outstandingAmount = normalizeMoney(booking.getTotalPrice()).subtract(paidAmount)
+                .max(BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        List<Payment> pendingPayments = payments.stream()
+                .filter(payment -> payment.getStatus() == com.wheelGo.model.enums.PaymentStatus.PENDING)
+                .toList();
+
+        if (pendingPayments.isEmpty()) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        Payment latestPendingPayment = pendingPayments.getFirst();
+        latestPendingPayment.setAmount(outstandingAmount);
+        latestPendingPayment.setUpdatedAt(now);
+
+        pendingPayments.stream()
+                .skip(1)
+                .forEach(payment -> {
+                    payment.setStatus(com.wheelGo.model.enums.PaymentStatus.FAILED);
+                    payment.setUpdatedAt(now);
+                });
+
+        paymentRepository.saveAll(pendingPayments);
+    }
+
+    private void failPendingPaymentsForBooking(UUID bookingId) {
+        List<Payment> pendingPayments = paymentRepository.findAllByBookingIdOrderByCreatedAtDesc(bookingId).stream()
+                .filter(payment -> payment.getStatus() == com.wheelGo.model.enums.PaymentStatus.PENDING)
+                .toList();
+        if (pendingPayments.isEmpty()) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        pendingPayments.forEach(payment -> payment.setUpdatedAt(now));
+        pendingPayments.forEach(payment -> payment.setStatus(com.wheelGo.model.enums.PaymentStatus.FAILED));
+        paymentRepository.saveAll(pendingPayments);
     }
 
     private Booking findBooking(UUID id) {
