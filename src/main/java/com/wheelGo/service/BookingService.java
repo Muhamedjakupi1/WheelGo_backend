@@ -355,6 +355,7 @@ public class BookingService {
         }
 
         booking.setStatus(targetStatus);
+        applyReviewEligibilityForStatus(booking, targetStatus);
         booking.setUpdatedAt(LocalDateTime.now());
         Booking savedBooking = bookingRepository.save(booking);
         syncVehicleStatus(savedBooking.getVehicleId());
@@ -492,6 +493,9 @@ public class BookingService {
         response.setStatus(booking.getStatus());
         response.setNotes(booking.getNotes());
         response.setSpecialRequest(booking.getNotes());
+        response.setReviewEligible(booking.getReviewEligible());
+        response.setReviewEligibleAt(booking.getReviewEligibleAt());
+        response.setReviewSubmittedAt(booking.getReviewSubmittedAt());
         response.setCreatedAt(booking.getCreatedAt());
         response.setUpdatedAt(booking.getUpdatedAt());
         response.setBabySeatRequested(babySeatRequested);
@@ -593,6 +597,16 @@ public class BookingService {
                 .forEach(this::releaseFinishedAddonInventoryForTenant);
     }
 
+    @Scheduled(
+            initialDelayString = "${app.bookings.review-eligibility-initial-delay-ms:90000}",
+            fixedDelayString = "${app.bookings.review-eligibility-delay-ms:300000}"
+    )
+    public void markReviewEligibilityForAllTenants() {
+        tenantRepository.findAll().stream()
+                .filter(tenant -> tenant.getSchemaName() != null && !tenant.getSchemaName().isBlank())
+                .forEach(tenant -> tenantSchemaExecutor.runForTenant(tenant, this::markCompletedBookingsReviewEligible));
+    }
+
     private void releaseFinishedAddonInventoryForTenant(Tenant tenant) {
         tenantSchemaExecutor.runForTenant(tenant, this::releaseFinishedAddonInventory);
     }
@@ -604,8 +618,12 @@ public class BookingService {
                 LocalDateTime.now()
         );
         for (Booking booking : finishedBookings) {
+            BookingStatus completedStatus = booking.getStatus() == BookingStatus.PENDING
+                    ? BookingStatus.CANCELLED
+                    : BookingStatus.COMPLETED;
             releaseBookingAddonInventory(booking);
-            booking.setStatus(booking.getStatus() == BookingStatus.PENDING ? BookingStatus.CANCELLED : BookingStatus.COMPLETED);
+            booking.setStatus(completedStatus);
+            applyReviewEligibilityForStatus(booking, completedStatus);
             booking.setUpdatedAt(LocalDateTime.now());
         }
         if (!finishedBookings.isEmpty()) {
@@ -623,6 +641,26 @@ public class BookingService {
                     .forEach(cacheInvalidationService::evictBookingsForUser);
             cacheInvalidationService.evictBookingsForAdmin();
         }
+    }
+
+    @Transactional
+    public void markCompletedBookingsReviewEligible() {
+        List<Booking> bookings = bookingRepository.findAllReviewEligibilityCandidates(BookingStatus.COMPLETED);
+        if (bookings.isEmpty()) {
+            return;
+        }
+
+        bookings.forEach(booking -> {
+            booking.setReviewEligible(true);
+            booking.setReviewEligibleAt(booking.getReviewEligibleAt() != null ? booking.getReviewEligibleAt() : LocalDateTime.now());
+            booking.setUpdatedAt(LocalDateTime.now());
+        });
+        bookingRepository.saveAll(bookings);
+        bookings.stream()
+                .map(Booking::getUserId)
+                .distinct()
+                .forEach(cacheInvalidationService::evictBookingsForUser);
+        cacheInvalidationService.evictBookingsForAdmin();
     }
 
     private void releaseBookingAddonInventory(Booking booking) {
@@ -648,6 +686,21 @@ public class BookingService {
 
     private boolean isTerminalStatus(BookingStatus status) {
         return status == BookingStatus.COMPLETED || status == BookingStatus.CANCELLED;
+    }
+
+    private void applyReviewEligibilityForStatus(Booking booking, BookingStatus status) {
+        if (status == BookingStatus.COMPLETED && booking.getReviewSubmittedAt() == null) {
+            booking.setReviewEligible(true);
+            if (booking.getReviewEligibleAt() == null) {
+                booking.setReviewEligibleAt(LocalDateTime.now());
+            }
+            return;
+        }
+
+        if (status == BookingStatus.CANCELLED) {
+            booking.setReviewEligible(false);
+            booking.setReviewEligibleAt(null);
+        }
     }
 
     private int resolveBabySeatQuantity(BookingCreateRequest request) {

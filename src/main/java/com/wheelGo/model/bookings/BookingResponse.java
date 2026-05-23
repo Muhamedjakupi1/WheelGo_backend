@@ -41,6 +41,9 @@ public class BookingResponse {
     private PaymentStatus paymentStatus;
     private PaymentMethod paymentMethod;
     private String invoiceNumber;
+    private Boolean reviewEligible;
+    private LocalDateTime reviewEligibleAt;
+    private LocalDateTime reviewSubmittedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
