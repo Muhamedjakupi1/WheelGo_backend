@@ -1,6 +1,6 @@
 package com.wheelGo.controller;
 
-import com.wheelGo.model.addon.Addon;
+import com.wheelGo.mapper.AddonMapper;
 import com.wheelGo.model.addon.AddonResponse;
 import com.wheelGo.repository.AddonRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,26 +18,12 @@ import java.util.List;
 @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'SUPER_ADMIN')")
 public class AddonController {
     private final AddonRepository addonRepository;
+    private final AddonMapper addonMapper;
 
     @GetMapping
     public ResponseEntity<List<AddonResponse>> getActiveAddons() {
-        return ResponseEntity.ok(addonRepository.findAllByIsActiveTrueAndIsDeletedFalseOrderByNameAsc().stream()
-                .map(this::toResponse)
-                .toList());
-    }
-
-    private AddonResponse toResponse(Addon addon) {
-        AddonResponse response = new AddonResponse();
-        response.setId(addon.getId());
-        response.setName(addon.getName());
-        response.setDescription(addon.getDescription());
-        response.setPrice(addon.getPrice());
-        response.setQuantity(addon.getQuantity());
-        response.setType(addon.getType());
-        response.setIsActive(addon.getIsActive());
-        response.setInventoryManaged(addon.getInventoryManaged());
-        response.setCreatedAt(addon.getCreatedAt());
-        response.setUpdatedAt(addon.getUpdatedAt());
-        return response;
+        return ResponseEntity.ok(addonMapper.toResponseList(
+                addonRepository.findAllByIsActiveTrueAndIsDeletedFalseOrderByNameAsc()
+        ));
     }
 }
