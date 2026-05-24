@@ -174,7 +174,7 @@ The backend exposes many endpoints. The most important groups are:
 | Payments | `/api/v1/payments`, `/api/v1/admin/payments` |
 | Invoices | `/api/v1/invoices` |
 | Driver license | `/api/driver-license` |
-| User profile | `/api/v1/user-profile`, `/api/user-profile` |
+| User profile | `/api/user-profile` |
 | User settings | `/api/user-settings` |
 | Admin users | `/api/v1/admin/users` |
 | Tenant settings | `/api/v1/tenant-settings`, `/api/v1/admin/tenant-settings` |
