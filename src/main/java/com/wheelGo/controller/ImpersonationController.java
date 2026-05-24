@@ -27,14 +27,6 @@ public class ImpersonationController {
         return ResponseEntity.ok(impersonationService.startForTenant(tenantSlug, superAdmin));
     }
 
-    @PostMapping("/start/{tenantSlug}/{targetUserId}")
-    @PreAuthorize("hasRole('SUPER_ADMIN') and !principal.impersonating")
-    public ResponseEntity<?> start(@PathVariable String tenantSlug,
-                                   @PathVariable UUID targetUserId,
-                                   @org.springframework.security.core.annotation.AuthenticationPrincipal CustomUserPrincipal superAdmin) {
-        return ResponseEntity.ok(impersonationService.startForTenant(tenantSlug, superAdmin));
-    }
-
     @PostMapping("/stop")
     @PreAuthorize("isAuthenticated() and principal.impersonating")
     public ResponseEntity<?> stop(@org.springframework.security.core.annotation.AuthenticationPrincipal CustomUserPrincipal current) {

@@ -1,7 +1,9 @@
 package com.wheelGo.controller;
 
 import com.wheelGo.controller.support.SecuredControllerTestConfig;
+import com.wheelGo.mapper.AddonMapper;
 import com.wheelGo.model.addon.Addon;
+import com.wheelGo.model.addon.AddonResponse;
 import com.wheelGo.repository.AddonRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +34,9 @@ class AddonControllerTest {
     @MockitoBean
     private AddonRepository addonRepository;
 
+    @MockitoBean
+    private AddonMapper addonMapper;
+
     @Test
     void should_return_ok_when_get_active_addons_authenticated() throws Exception {
         Addon addon = new Addon();
@@ -40,7 +45,12 @@ class AddonControllerTest {
         addon.setPrice(new BigDecimal("15.00"));
         addon.setIsActive(true);
         addon.setIsDeleted(false);
+        AddonResponse response = new AddonResponse();
+        response.setId(addon.getId());
+        response.setName(addon.getName());
+        response.setPrice(addon.getPrice());
         when(addonRepository.findAllByIsActiveTrueAndIsDeletedFalseOrderByNameAsc()).thenReturn(List.of(addon));
+        when(addonMapper.toResponseList(List.of(addon))).thenReturn(List.of(response));
 
         mockMvc.perform(get("/api/v1/addons").with(user("user").roles("USER")))
                 .andExpect(status().isOk())

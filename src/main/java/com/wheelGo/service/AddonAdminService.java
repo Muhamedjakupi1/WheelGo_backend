@@ -1,5 +1,6 @@
 package com.wheelGo.service;
 
+import com.wheelGo.mapper.AddonMapper;
 import com.wheelGo.model.addon.Addon;
 import com.wheelGo.model.addon.AddonRequest;
 import com.wheelGo.model.addon.AddonResponse;
@@ -29,12 +30,11 @@ public class AddonAdminService {
 
     private final AddonRepository addonRepository;
     private final BookingAddonRepository bookingAddonRepository;
+    private final AddonMapper addonMapper;
 
     @Transactional(readOnly = true)
     public List<AddonResponse> getAll() {
-        return addonRepository.findAllByIsDeletedFalseOrderByNameAsc().stream()
-                .map(this::toResponse)
-                .toList();
+        return addonMapper.toResponseList(addonRepository.findAllByIsDeletedFalseOrderByNameAsc());
     }
 
     @Transactional
@@ -146,18 +146,7 @@ public class AddonAdminService {
     }
 
     private AddonResponse toResponse(Addon addon) {
-        AddonResponse response = new AddonResponse();
-        response.setId(addon.getId());
-        response.setName(addon.getName());
-        response.setDescription(addon.getDescription());
-        response.setPrice(addon.getPrice());
-        response.setQuantity(addon.getQuantity());
-        response.setType(addon.getType());
-        response.setIsActive(addon.getIsActive());
-        response.setInventoryManaged(addon.getInventoryManaged());
-        response.setCreatedAt(addon.getCreatedAt());
-        response.setUpdatedAt(addon.getUpdatedAt());
-        return response;
+        return addonMapper.toResponse(addon);
     }
 
     private BigDecimal normalizePrice(BigDecimal price) {

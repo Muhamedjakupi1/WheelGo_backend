@@ -1,5 +1,6 @@
 package com.wheelGo.service;
 
+import com.wheelGo.mapper.AddonMapper;
 import com.wheelGo.model.addon.Addon;
 import com.wheelGo.model.addon.AddonRequest;
 import com.wheelGo.model.addon.AddonResponse;
@@ -24,6 +25,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -37,6 +40,9 @@ class AddonAdminServiceTest {
 
     @Mock
     private BookingAddonRepository bookingAddonRepository;
+
+    @Mock
+    private AddonMapper addonMapper;
 
     @InjectMocks
     private AddonAdminService addonAdminService;
@@ -58,6 +64,11 @@ class AddonAdminServiceTest {
         addon.setIsActive(true);
         addon.setInventoryManaged(true);
         addon.setIsDeleted(false);
+
+        lenient().when(addonMapper.toResponse(any(Addon.class))).thenAnswer(invocation -> toResponse(invocation.getArgument(0)));
+        lenient().when(addonMapper.toResponseList(anyList())).thenAnswer(invocation -> invocation.<List<Addon>>getArgument(0).stream()
+                .map(this::toResponse)
+                .toList());
     }
 
     @Test
@@ -266,5 +277,20 @@ class AddonAdminServiceTest {
         assertThat(result).hasSize(2);
         verify(addonRepository, org.mockito.Mockito.times(2)).save(addonCaptor.capture());
         assertThat(addonCaptor.getAllValues()).hasSize(2);
+    }
+
+    private AddonResponse toResponse(Addon addon) {
+        AddonResponse response = new AddonResponse();
+        response.setId(addon.getId());
+        response.setName(addon.getName());
+        response.setDescription(addon.getDescription());
+        response.setPrice(addon.getPrice());
+        response.setQuantity(addon.getQuantity());
+        response.setType(addon.getType());
+        response.setIsActive(addon.getIsActive());
+        response.setInventoryManaged(addon.getInventoryManaged());
+        response.setCreatedAt(addon.getCreatedAt());
+        response.setUpdatedAt(addon.getUpdatedAt());
+        return response;
     }
 }
