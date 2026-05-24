@@ -31,3 +31,4 @@ build/
 uploads/driver-license-images
 ### VS Code ###
 .vscode/
+/uploads/
