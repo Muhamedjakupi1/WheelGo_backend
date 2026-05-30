@@ -151,8 +151,10 @@ class DriverLicenseServiceTest {
         when(fileStorageService.resolveStoredUpload("/uploads/front.png")).thenReturn(java.nio.file.Path.of("front.png"));
         when(fileStorageService.resolveStoredUpload("/uploads/back.png")).thenReturn(java.nio.file.Path.of("back.png"));
         when(userProfileRepository.findByUser_Id(userId)).thenReturn(Optional.empty());
-        when(paddleOcrDriverLicenseTextService.readText(any(), any()))
-                .thenReturn(new PaddleOcrDriverLicenseTextService.OcrResult("123 Kosovo " + license.getExpiryDate(), java.util.List.of()));
+        when(paddleOcrDriverLicenseTextService.readTextAsync(any(), any()))
+                .thenReturn(CompletableFuture.completedFuture(
+                        new PaddleOcrDriverLicenseTextService.OcrResult("123 Kosovo " + license.getExpiryDate(), java.util.List.of())
+                ));
         when(ollamaDriverLicenseVerificationService.verifyAsync(any(), any()))
                 .thenReturn(CompletableFuture.completedFuture(aiVerification));
         when(tenantSchemaExecutor.callInSchema(any(), any())).thenAnswer(invocation -> {

@@ -125,10 +125,13 @@ public class DriverLicenseService {
         java.nio.file.Path frontImagePath = fileStorageService.resolveStoredUpload(license.getFrontImageUrl());
         java.nio.file.Path backImagePath = fileStorageService.resolveStoredUpload(license.getBackImageUrl());
 
-        PaddleOcrDriverLicenseTextService.OcrResult ocrResult = paddleOcrDriverLicenseTextService.readText(frontImagePath, backImagePath);
+        CompletableFuture<PaddleOcrDriverLicenseTextService.OcrResult> ocrFuture =
+                paddleOcrDriverLicenseTextService.readTextAsync(frontImagePath, backImagePath);
+        CompletableFuture<DriverLicenseVerificationResponse> aiFuture =
+                ollamaDriverLicenseVerificationService.verifyAsync(frontImagePath, backImagePath);
 
-        return ollamaDriverLicenseVerificationService.verifyAsync(frontImagePath, backImagePath)
-                .thenApply(aiResponse -> tenantSchemaExecutor.callInSchema(schemaName, () -> {
+        return ocrFuture.thenCombine(aiFuture, (ocrResult, aiResponse) ->
+                tenantSchemaExecutor.callInSchema(schemaName, () -> {
                     DriverLicenseVerificationResponse response = buildOcrVerificationResponse(
                             aiResponse,
                             ocrResult,
