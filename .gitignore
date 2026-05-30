@@ -32,3 +32,10 @@ uploads/driver-license-images
 ### VS Code ###
 .vscode/
 /uploads/
+## OCR ##
+__pycache__/
+*.pyc
+paddleocr_cache/
+.paddleocr-cache/
+.paddlex/
+
