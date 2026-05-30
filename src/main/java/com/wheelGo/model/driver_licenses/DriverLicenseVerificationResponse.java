@@ -16,6 +16,11 @@ public class DriverLicenseVerificationResponse {
     private String extractedName;
     private String extractedExpiryDate;
     private String extractedCountry;
+    private boolean licenseNumberMatches;
+    private boolean issuingCountryMatches;
+    private boolean expiryDateMatches;
+    private String ocrText;
+    private List<String> ocrLines;
     private List<String> tamperingSignals;
     private double confidence;
     private String recommendation;

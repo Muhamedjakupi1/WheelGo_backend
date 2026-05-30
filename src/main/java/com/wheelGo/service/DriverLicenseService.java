@@ -5,8 +5,10 @@ import com.wheelGo.model.driver_licenses.DriverLicenseResponse;
 import com.wheelGo.model.driver_licenses.DriverLicenseUpdateRequest;
 import com.wheelGo.model.driver_licenses.DriverLicenseVerificationResponse;
 import com.wheelGo.model.user.User;
+import com.wheelGo.model.user_profiles.UserProfile;
 import com.wheelGo.repository.DriverLicenseRepository;
 import com.wheelGo.repository.UserRepository;
+import com.wheelGo.repository.UserProfileRepository;
 import com.wheelGo.schema.TenantContext;
 import com.wheelGo.schema.TenantSchemaExecutor;
 import com.wheelGo.tools.SecurityUtils;
@@ -19,6 +21,11 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.text.Normalizer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -30,7 +37,9 @@ public class DriverLicenseService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final OllamaDriverLicenseVerificationService ollamaDriverLicenseVerificationService;
+    private final PaddleOcrDriverLicenseTextService paddleOcrDriverLicenseTextService;
     private final TenantSchemaExecutor tenantSchemaExecutor;
+    private final UserProfileRepository userProfileRepository;
 
     @Transactional(readOnly = true)
     public DriverLicenseResponse getMyLicense(UUID userId) {
@@ -110,16 +119,83 @@ public class DriverLicenseService {
         clearVerificationState(license);
         driverLicenseRepository.save(license);
         String schemaName = TenantContext.getCurrentSchema();
+        String expectedProfileName = userProfileRepository.findByUser_Id(userId)
+                .map(this::buildProfileName)
+                .orElse("");
+        java.nio.file.Path frontImagePath = fileStorageService.resolveStoredUpload(license.getFrontImageUrl());
+        java.nio.file.Path backImagePath = fileStorageService.resolveStoredUpload(license.getBackImageUrl());
 
-        return ollamaDriverLicenseVerificationService.verifyAsync(
-                fileStorageService.resolveStoredUpload(license.getFrontImageUrl()),
-                fileStorageService.resolveStoredUpload(license.getBackImageUrl())
-        ).thenApply(response -> tenantSchemaExecutor.callInSchema(schemaName, () -> {
-            applyVerificationResult(license, response.isVerified());
-            DriverLicense saved = driverLicenseRepository.save(license);
-            response.setLicense(toResponse(saved, userId));
-            return response;
-        }));
+        PaddleOcrDriverLicenseTextService.OcrResult ocrResult = paddleOcrDriverLicenseTextService.readText(frontImagePath, backImagePath);
+
+        return ollamaDriverLicenseVerificationService.verifyAsync(frontImagePath, backImagePath)
+                .thenApply(aiResponse -> tenantSchemaExecutor.callInSchema(schemaName, () -> {
+                    DriverLicenseVerificationResponse response = buildOcrVerificationResponse(
+                            aiResponse,
+                            ocrResult,
+                            license,
+                            expectedProfileName
+                    );
+                    applyVerificationResult(license, response.isVerified());
+                    DriverLicense saved = driverLicenseRepository.save(license);
+                    response.setLicense(toResponse(saved, userId));
+                    return response;
+                }));
+    }
+
+    private DriverLicenseVerificationResponse buildOcrVerificationResponse(DriverLicenseVerificationResponse aiResponse,
+                                                                           PaddleOcrDriverLicenseTextService.OcrResult ocrResult,
+                                                                           DriverLicense license,
+                                                                           String expectedProfileName) {
+        DriverLicenseVerificationResponse response = new DriverLicenseVerificationResponse();
+        String normalizedText = normalizeForContains(ocrResult.getText());
+        boolean documentLooksLikeLicense = aiResponse.isDocumentVisible() && aiResponse.isDriverLicenseLike();
+        boolean licenseNumberMatches = containsNormalized(normalizedText, license.getLicenseNumber());
+        boolean countryMatches = countryMatches(normalizedText, license.getIssuingCountry());
+        boolean expiryDateMatches = expiryDateMatches(normalizedText, license.getExpiryDate());
+        boolean nameMatches = isBlank(expectedProfileName) || nameMatches(normalizedText, expectedProfileName);
+
+        response.setExtractedLicenseNumber(licenseNumberMatches ? license.getLicenseNumber() : "");
+        response.setExtractedCountry(countryMatches ? license.getIssuingCountry() : "");
+        response.setExtractedExpiryDate(expiryDateMatches ? license.getExpiryDate().toString() : "");
+        response.setExtractedName(nameMatches && !isBlank(expectedProfileName) ? expectedProfileName : "");
+        response.setLicenseNumberMatches(licenseNumberMatches);
+        response.setIssuingCountryMatches(countryMatches);
+        response.setExpiryDateMatches(expiryDateMatches);
+        response.setProfileNameMatches(nameMatches);
+        response.setRequiredFieldsExtracted(licenseNumberMatches && countryMatches && expiryDateMatches);
+        response.setOcrText(ocrResult.getText());
+        response.setOcrLines(ocrResult.getLines());
+
+        boolean ocrMatches = licenseNumberMatches && countryMatches && expiryDateMatches && nameMatches;
+        response.setVerified(documentLooksLikeLicense && ocrMatches);
+        response.setVerdict(ocrMatches ? "ocr_passed" : "rejected");
+        response.setDocumentVisible(aiResponse.isDocumentVisible());
+        response.setImageQualityOk(aiResponse.isImageQualityOk());
+        response.setDriverLicenseLike(aiResponse.isDriverLicenseLike());
+        response.setTamperingSignals(aiResponse.getTamperingSignals() == null ? List.of() : aiResponse.getTamperingSignals());
+        response.setConfidence(calculateOcrConfidence(licenseNumberMatches, countryMatches, expiryDateMatches, nameMatches, expectedProfileName));
+        if (!documentLooksLikeLicense) {
+            response.setVerdict("rejected");
+            response.setRecommendation("AI rejected the upload because it does not look like a driver license.");
+        } else if (!ocrMatches) {
+            List<String> mismatches = new ArrayList<>();
+            if (!licenseNumberMatches) {
+                mismatches.add("license number");
+            }
+            if (!countryMatches) {
+                mismatches.add("issuing country");
+            }
+            if (!expiryDateMatches) {
+                mismatches.add("expiry date");
+            }
+            if (!nameMatches) {
+                mismatches.add("profile name");
+            }
+            response.setRecommendation("OCR mismatch: " + String.join(", ", mismatches) + " did not match the uploaded images.");
+        } else {
+            response.setRecommendation("The upload looks like a driver license and OCR matched the submitted details.");
+        }
+        return response;
     }
 
     private void applyRequiredDetailsForVerification(DriverLicense license, DriverLicenseUpdateRequest request) {
@@ -189,6 +265,96 @@ public class DriverLicenseService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + " cannot be empty");
         }
         return trimmed;
+    }
+
+    private String buildProfileName(UserProfile profile) {
+        return ((profile.getFirstName() == null ? "" : profile.getFirstName()) + " " +
+                (profile.getLastName() == null ? "" : profile.getLastName())).trim();
+    }
+
+    private boolean containsNormalized(String normalizedText, String expectedValue) {
+        String normalizedExpected = normalizeForContains(expectedValue);
+        return !normalizedExpected.isBlank() && normalizedText.contains(normalizedExpected);
+    }
+
+    private boolean countryMatches(String normalizedText, String issuingCountry) {
+        if (containsNormalized(normalizedText, issuingCountry)) {
+            return true;
+        }
+        String normalizedCountry = normalizeForContains(issuingCountry);
+        if (List.of("kosovo", "kosova", "kosove").contains(normalizedCountry)) {
+            return normalizedText.contains("kosovo") || normalizedText.contains("kosova") || normalizedText.contains("kosove");
+        }
+        return false;
+    }
+
+    private boolean expiryDateMatches(String normalizedText, LocalDate expiryDate) {
+        if (expiryDate == null) {
+            return false;
+        }
+        return expiryDateVariants(expiryDate).stream()
+                .map(this::normalizeForContains)
+                .anyMatch(normalizedText::contains);
+    }
+
+    private List<String> expiryDateVariants(LocalDate date) {
+        return List.of(
+                date.format(DateTimeFormatter.ISO_LOCAL_DATE),
+                date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")),
+                date.format(DateTimeFormatter.ofPattern("dd.MM.yy")),
+                date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                date.format(DateTimeFormatter.ofPattern("dd/MM/yy")),
+                date.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")),
+                date.format(DateTimeFormatter.ofPattern("dd-MM-yy")),
+                date.format(DateTimeFormatter.ofPattern("MM/dd/yyyy")),
+                date.format(DateTimeFormatter.ofPattern("MM/dd/yy")),
+                date.format(DateTimeFormatter.ofPattern("yyyyMMdd")),
+                date.format(DateTimeFormatter.ofPattern("ddMMyyyy")),
+                date.format(DateTimeFormatter.ofPattern("ddMMyy"))
+        );
+    }
+
+    private boolean nameMatches(String normalizedText, String expectedProfileName) {
+        String[] parts = expectedProfileName.trim().split("\\s+");
+        int matchedParts = 0;
+        for (String part : parts) {
+            String normalizedPart = normalizeForContains(part);
+            if (normalizedPart.length() >= 2 && normalizedText.contains(normalizedPart)) {
+                matchedParts++;
+            }
+        }
+        return matchedParts >= Math.min(2, parts.length);
+    }
+
+    private String normalizeForContains(String value) {
+        if (value == null) {
+            return "";
+        }
+        String withoutMarks = Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+        return withoutMarks.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+    }
+
+    private double calculateOcrConfidence(boolean licenseNumberMatches,
+                                          boolean countryMatches,
+                                          boolean expiryDateMatches,
+                                          boolean nameMatches,
+                                          String expectedProfileName) {
+        int total = isBlank(expectedProfileName) ? 3 : 4;
+        int matched = 0;
+        if (licenseNumberMatches) {
+            matched++;
+        }
+        if (countryMatches) {
+            matched++;
+        }
+        if (expiryDateMatches) {
+            matched++;
+        }
+        if (!isBlank(expectedProfileName) && nameMatches) {
+            matched++;
+        }
+        return (double) matched / total;
     }
 
     private boolean isBlank(String value) {

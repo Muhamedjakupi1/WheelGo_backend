@@ -8,6 +8,7 @@ import com.wheelGo.model.tenant.Tenant;
 import com.wheelGo.model.user.User;
 import com.wheelGo.repository.DriverLicenseRepository;
 import com.wheelGo.repository.UserRepository;
+import com.wheelGo.repository.UserProfileRepository;
 import com.wheelGo.schema.TenantSchemaExecutor;
 import com.wheelGo.security.CustomUserPrincipal;
 import org.junit.jupiter.api.AfterEach;
@@ -30,7 +31,6 @@ import java.util.concurrent.CompletableFuture;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,7 +40,9 @@ class DriverLicenseServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private FileStorageService fileStorageService;
     @Mock private OllamaDriverLicenseVerificationService ollamaDriverLicenseVerificationService;
+    @Mock private PaddleOcrDriverLicenseTextService paddleOcrDriverLicenseTextService;
     @Mock private TenantSchemaExecutor tenantSchemaExecutor;
+    @Mock private UserProfileRepository userProfileRepository;
     @InjectMocks private DriverLicenseService driverLicenseService;
 
     private UUID userId;
@@ -138,16 +140,21 @@ class DriverLicenseServiceTest {
         license.setExpiryDate(LocalDate.now().plusYears(1));
         license.setFrontImageUrl("/uploads/front.png");
         license.setBackImageUrl("/uploads/back.png");
-        DriverLicenseVerificationResponse verification = new DriverLicenseVerificationResponse();
-        verification.setVerified(true);
+        DriverLicenseVerificationResponse aiVerification = new DriverLicenseVerificationResponse();
+        aiVerification.setDocumentVisible(true);
+        aiVerification.setDriverLicenseLike(true);
+        aiVerification.setImageQualityOk(true);
 
         when(userRepository.findByIdAndTenantId(userId, tenantId)).thenReturn(Optional.of(user));
         when(driverLicenseRepository.findByUser_Id(userId)).thenReturn(Optional.of(license));
         when(driverLicenseRepository.save(any(DriverLicense.class))).thenReturn(license);
         when(fileStorageService.resolveStoredUpload("/uploads/front.png")).thenReturn(java.nio.file.Path.of("front.png"));
         when(fileStorageService.resolveStoredUpload("/uploads/back.png")).thenReturn(java.nio.file.Path.of("back.png"));
+        when(userProfileRepository.findByUser_Id(userId)).thenReturn(Optional.empty());
+        when(paddleOcrDriverLicenseTextService.readText(any(), any()))
+                .thenReturn(new PaddleOcrDriverLicenseTextService.OcrResult("123 Kosovo " + license.getExpiryDate(), java.util.List.of()));
         when(ollamaDriverLicenseVerificationService.verifyAsync(any(), any()))
-                .thenReturn(CompletableFuture.completedFuture(verification));
+                .thenReturn(CompletableFuture.completedFuture(aiVerification));
         when(tenantSchemaExecutor.callInSchema(any(), any())).thenAnswer(invocation -> {
             java.util.function.Supplier<?> supplier = invocation.getArgument(1);
             return supplier.get();
@@ -156,5 +163,7 @@ class DriverLicenseServiceTest {
         DriverLicenseVerificationResponse result = driverLicenseService.verifyMyLicense(userId, null).join();
 
         assertThat(result.isVerified()).isTrue();
+        assertThat(result.isRequiredFieldsExtracted()).isTrue();
+        assertThat(result.getVerdict()).isEqualTo("ocr_passed");
     }
 }
