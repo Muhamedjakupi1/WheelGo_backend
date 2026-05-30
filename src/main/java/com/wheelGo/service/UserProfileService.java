@@ -140,7 +140,7 @@ public class UserProfileService {
     }
 
     private UserProfileResponse enrichProfileResponse(UserProfileResponse response, User user) {
-        response.setTotalRides(bookingRepository.countByUserIdAndStatus(user.getId(), BookingStatus.CONFIRMED));
+        response.setTotalRides(bookingRepository.countByUserIdAndStatus(user.getId(), BookingStatus.COMPLETED));
         response.setMemberSince(user.getCreatedAt());
         response.setAverageRating(reviewRepository.findAverageRatingByUserId(user.getId()));
         return response;
